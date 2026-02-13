@@ -48,15 +48,38 @@ def get_output_path(list_url: str) -> str:
 
 def fetch_list(url: str) -> str:
     """Загружает текст списка по URL."""
+    # Валидация URL перед использованием
+    try:
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError(f"Некорректный URL: {url}")
+        # Проверка на управляющие символы
+        if any(ord(c) < 32 and c not in '\t\n\r' for c in url):
+            raise ValueError(f"URL содержит управляющие символы: {url}")
+    except Exception as e:
+        raise ValueError(f"Ошибка валидации URL: {e}")
+    
     r = requests.get(url, timeout=15)
     r.raise_for_status()
     return r.text
 
 
 def load_urls_from_file(path: str) -> list[str]:
-    """Читает файл с URL (по одному на строку), возвращает список непустых URL."""
+    """Читает файл с URL (по одному на строку), возвращает список непустых URL.
+    Обрабатывает случаи, когда в строке несколько URL, разделенных пробелами."""
+    urls = []
     with open(path, encoding="utf-8") as f:
-        urls = [line.strip() for line in f if line.strip()]
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            # Разбиваем строку по пробелам и берем только валидные URL
+            parts = line.split()
+            for part in parts:
+                part = part.strip()
+                # Проверяем, что это похоже на URL
+                if part.startswith(("http://", "https://")):
+                    urls.append(part)
     return urls
 
 
@@ -426,21 +449,35 @@ def load_merged_keys(links_file: str) -> tuple[str, list[tuple[str, str]]]:
         )
         
         for idx, url in enumerate(urls, 1):
-            text = fetch_list(url)
-            parsed = parse_proxy_lines(text)
-            new_count = 0
-            for link, full in parsed:
-                if link not in seen_links:
-                    seen_links.add(link)
-                    result.append((link, full))
-                    new_count += 1
-            
-            # Обновляем прогресс-бар с информацией
-            progress.update(
-                task,
-                advance=1,
-                description=f"[cyan]Парсинг ссылок...[/cyan] [{idx}/{total_urls}] получено {len(parsed)} ключей, новых {new_count}, всего: {len(result)}"
-            )
+            try:
+                text = fetch_list(url)
+                parsed = parse_proxy_lines(text)
+                new_count = 0
+                for link, full in parsed:
+                    if link not in seen_links:
+                        seen_links.add(link)
+                        result.append((link, full))
+                        new_count += 1
+                
+                # Обновляем прогресс-бар с информацией
+                progress.update(
+                    task,
+                    advance=1,
+                    description=f"[cyan]Парсинг ссылок...[/cyan] [{idx}/{total_urls}] {url} -> получено {len(parsed)} ключей, новых {new_count}, всего: {len(result)}"
+                )
+            except (requests.RequestException, requests.exceptions.InvalidURL, OSError, ValueError) as e:
+                # При ошибке загрузки или валидации URL помечаем URL и продолжаем
+                error_msg = str(e)
+                # Обрезаем длинные сообщения об ошибках
+                if len(error_msg) > 100:
+                    error_msg = error_msg[:97] + "..."
+                console.print(f"[yellow][{idx}/{total_urls}][/yellow] [red]Ошибка загрузки:[/red] {url} -> {error_msg}")
+                progress.update(
+                    task,
+                    advance=1,
+                    description=f"[cyan]Парсинг ссылок...[/cyan] [{idx}/{total_urls}] [red]Ошибка:[/red] {url} (пропущено)"
+                )
+                continue
     
     console.print(f"[bold]Итого уникальных ключей:[/bold] {len(result)}\n")
     return ("merged", result)

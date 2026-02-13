@@ -4,6 +4,7 @@
 # Текстовые файлы (кроме README.md)
 *.txt
 !requirements.txt
+!white-list_available.txt
 *.md
 !README.md
 
@@ -47,4 +48,5 @@ available*.json
 
 # Результаты проверки (если не нужно коммитить)
 available*.txt
+!available.txt
 github_parser/

@@ -7,6 +7,8 @@ import ipaddress
 import os
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
 import urllib.request
 
 CIDR_WHITELIST_URL = os.environ.get(
@@ -17,6 +19,17 @@ LINKS_FILE = os.environ.get("LINKS_FILE", "links.txt")
 
 
 def fetch(url: str) -> str:
+    # Валидация URL перед использованием
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError(f"Некорректный URL: {url}")
+        # Проверка на управляющие символы
+        if any(ord(c) < 32 and c not in '\t\n\r' for c in url):
+            raise ValueError(f"URL содержит управляющие символы: {url}")
+    except Exception as e:
+        raise ValueError(f"Ошибка валидации URL: {e}")
+    
     with urllib.request.urlopen(url, timeout=30) as r:
         return r.read().decode("utf-8", errors="replace")
 
@@ -46,15 +59,24 @@ def merge_keys_from_urls(urls: list[str]) -> str:
     total = len(urls)
     print(f"Парсинг и объединение ключей из {total} ссылок:")
     for idx, url in enumerate(urls, 1):
-        text = fetch(url)
-        parsed = parse_vless_lines(text)
-        new_count = 0
-        for link, full in parsed:
-            if link not in seen:
-                seen.add(link)
-                lines.append(full)
-                new_count += 1
-        print(f"  [{idx}/{total}] {url} -> получено {len(parsed)} ключей, новых {new_count}, всего уникальных: {len(lines)}")
+        try:
+            text = fetch(url)
+            parsed = parse_vless_lines(text)
+            new_count = 0
+            for link, full in parsed:
+                if link not in seen:
+                    seen.add(link)
+                    lines.append(full)
+                    new_count += 1
+            print(f"  [{idx}/{total}] {url} -> получено {len(parsed)} ключей, новых {new_count}, всего уникальных: {len(lines)}")
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError) as e:
+            # При ошибке загрузки или валидации URL помечаем URL и продолжаем
+            error_msg = str(e)
+            # Обрезаем длинные сообщения об ошибках
+            if len(error_msg) > 100:
+                error_msg = error_msg[:97] + "..."
+            print(f"  [{idx}/{total}] Ошибка загрузки: {url} -> {error_msg} (пропущено)", file=sys.stderr)
+            continue
     print(f"Итого уникальных ключей: {len(lines)}\n")
     return "\n".join(lines)
 
@@ -121,7 +143,18 @@ def main():
             print(f"Ошибка: файл со ссылками не найден: {links_path}", file=sys.stderr)
             sys.exit(1)
         with open(links_path, encoding="utf-8") as f:
-            urls = [line.strip() for line in f if line.strip()]
+            urls = []
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                # Разбиваем строку по пробелам и берем только валидные URL
+                parts = line.split()
+                for part in parts:
+                    part = part.strip()
+                    # Проверяем, что это похоже на URL
+                    if part.startswith(("http://", "https://")):
+                        urls.append(part)
         if not urls:
             print("В файле со ссылками нет URL.", file=sys.stderr)
             sys.exit(1)
