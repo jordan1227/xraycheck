@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Модуль парсинга прокси URL (VLESS, VMess, Trojan, Shadowsocks) и загрузки списков ключей.
+Модуль парсинга прокси URL (VLESS, VMess, Trojan, Shadowsocks, Hysteria, Hysteria2) и загрузки списков ключей.
 """
 
 import base64
@@ -85,7 +85,7 @@ def load_urls_from_file(path: str) -> list[str]:
 
 def parse_proxy_lines(text: str) -> list[tuple[str, str]]:
     """Возвращает список (прокси_ссылка, полная_строка) для строк с поддерживаемыми протоколами."""
-    supported_protocols = ("vless://", "vmess://", "trojan://", "ss://")
+    supported_protocols = ("vless://", "vmess://", "trojan://", "ss://", "hysteria://", "hysteria2://", "hy2://")
     result = []
     for line in text.splitlines():
         line = line.strip()
@@ -321,6 +321,79 @@ def parse_trojan_url(trojan_url: str) -> dict | None:
         return None
 
 
+def parse_hysteria_url(hysteria_url: str) -> dict | None:
+    """
+    Парсит hysteria://host:port?protocol=udp&auth=...&peer=... (Hysteria v1, Shadowrocket-стиль).
+    Возвращает словарь с полями для идентификации и проверки; Xray не поддерживает Hysteria.
+    """
+    try:
+        parsed = urlparse(hysteria_url)
+        if parsed.scheme != "hysteria" or not parsed.netloc:
+            return None
+        host_port = parsed.netloc
+        if ":" in host_port:
+            host, _, port_str = host_port.rpartition(":")
+            port = int(port_str)
+        else:
+            host, port = host_port, 443
+        if not host:
+            return None
+        query = parse_qs(parsed.query or "", keep_blank_values=True)
+        def get(name: str, default: str = "") -> str:
+            a = query.get(name, [default])
+            return (a[0] or default).strip()
+        return {
+            "protocol": "hysteria",
+            "address": host,
+            "port": port,
+            "auth": get("auth", ""),
+            "peer": get("peer", ""),
+            "insecure": get("insecure", ""),
+            "obfs": get("obfs", ""),
+            "obfsParam": get("obfsParam", ""),
+            "alpn": get("alpn", "hysteria"),
+        }
+    except Exception:
+        return None
+
+
+def parse_hysteria2_url(hysteria2_url: str) -> dict | None:
+    """
+    Парсит hysteria2://[auth@]hostname[:port]/?params или hy2:// (Hysteria 2).
+    Возвращает словарь с полями для идентификации; Xray не поддерживает Hysteria2.
+    """
+    try:
+        # Нормализуем схему: hy2 -> hysteria2
+        url = hysteria2_url.strip()
+        if url.startswith("hy2://"):
+            url = "hysteria2://" + url[6:]
+        parsed = urlparse(url)
+        if parsed.scheme != "hysteria2" or not parsed.hostname:
+            return None
+        host = parsed.hostname or ""
+        port = parsed.port if parsed.port is not None else 443
+        auth = (parsed.username or "")
+        if parsed.password:
+            auth = f"{parsed.username or ''}:{parsed.password}"
+        query = parse_qs(parsed.query or "", keep_blank_values=True)
+        def get(name: str, default: str = "") -> str:
+            a = query.get(name, [default])
+            return (a[0] or default).strip()
+        return {
+            "protocol": "hysteria2",
+            "address": host,
+            "port": port,
+            "auth": auth,
+            "sni": get("sni", ""),
+            "insecure": get("insecure", ""),
+            "obfs": get("obfs", ""),
+            "obfsPassword": get("obfs-password", ""),
+            "pinSHA256": get("pinSHA256", ""),
+        }
+    except Exception:
+        return None
+
+
 def parse_shadowsocks_url(ss_url: str) -> dict | None:
     """
     Парсит ss://base64(method:password)@host:port или ss://method:password@host:port.
@@ -401,8 +474,8 @@ def parse_shadowsocks_url(ss_url: str) -> dict | None:
 def parse_proxy_url(proxy_url: str) -> dict | None:
     """
     Универсальный парсер прокси URL. Определяет протокол и вызывает соответствующий парсер.
-    Поддерживает: VLESS, VMess, Trojan, Shadowsocks.
-    Возвращает словарь для построения конфига xray или None при ошибке.
+    Поддерживает: VLESS, VMess, Trojan, Shadowsocks, Hysteria, Hysteria2.
+    Возвращает словарь для построения конфига xray (или для проверки) или None при ошибке.
     """
     if not proxy_url:
         return None
@@ -417,6 +490,10 @@ def parse_proxy_url(proxy_url: str) -> dict | None:
         return parse_trojan_url(proxy_url)
     elif proxy_url.startswith("ss://"):
         return parse_shadowsocks_url(proxy_url)
+    elif proxy_url.startswith("hysteria://"):
+        return parse_hysteria_url(proxy_url)
+    elif proxy_url.startswith("hysteria2://") or proxy_url.startswith("hy2://"):
+        return parse_hysteria2_url(proxy_url)
     
     return None
 

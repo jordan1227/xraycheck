@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 Модуль проверки прокси-ключей - основная логика проверки.
-Поддерживает протоколы: VLESS, VMess, Trojan, Shadowsocks.
+Поддерживает протоколы: VLESS, VMess, Trojan, Shadowsocks, Hysteria, Hysteria2.
 """
 
 import json
 import logging
 import os
+import socket
 import tempfile
 import time
 from typing import Optional
@@ -53,6 +54,18 @@ from logger_config import should_debug as should_debug_func
 logger = logging.getLogger(__name__)
 from parsing import parse_proxy_url, parse_vless_url
 from port_pool import return_port, take_port
+
+
+def _check_hysteria_reachable(address: str, port: int, timeout: float) -> bool:
+    """
+    Проверка доступности сервера Hysteria/Hysteria2 по TCP (порт открыт).
+    Полная E2E-проверка через прокси требует отдельного клиента (Xray не поддерживает Hysteria).
+    """
+    try:
+        with socket.create_connection((address, port), timeout=timeout):
+            return True
+    except (socket.error, socket.gaierror, OSError):
+        return False
 from signals import active_processes
 from utils import (
     check_geolocation_allowed,
@@ -108,6 +121,17 @@ def check_key_e2e(vless_line: str, debug: bool = False, cache: Optional[dict] = 
         if should_debug_flag:
             logger.debug("Не удалось разобрать прокси-ссылку.")
         return (vless_line, False, metrics)
+
+    # Hysteria/Hysteria2: Xray не поддерживает; проверяем только доступность хоста по TCP
+    if parsed.get("protocol") in ("hysteria", "hysteria2"):
+        timeout = CONNECT_TIMEOUT_SLOW if USE_ADAPTIVE_TIMEOUT else CONNECT_TIMEOUT
+        ok = _check_hysteria_reachable(parsed["address"], parsed["port"], float(timeout))
+        if cache is not None and ENABLE_CACHE:
+            key_hash = get_key_hash(vless_line)
+            cache[key_hash] = {"result": ok, "timestamp": time.time()}
+        metrics["successful_urls"] = 1 if ok else 0
+        metrics["failed_urls"] = 0 if ok else 1
+        return (vless_line, ok, metrics)
 
     port = take_port()
     if port is None:

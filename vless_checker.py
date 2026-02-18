@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 Проверка прокси-ключей (end-to-end).
-Поддерживает протоколы: VLESS, VMess, Trojan, Shadowsocks.
-Загружает список по URL, для каждого ключа: поднимает локальный прокси через xray,
-делает HTTP-запрос через прокси к тестовому URL; по ответу решает «жив»/«мёртв».
-Рабочие ключи сохраняются в файл.
+Поддерживает протоколы: VLESS, VMess, Trojan, Shadowsocks, Hysteria, Hysteria2.
+Загружает список по URL; для каждого ключа: поднимает локальный прокси через xray
+(или проверка доступности для Hysteria/Hysteria2), делает HTTP-запрос через прокси
+к тестовому URL; по ответу решает «жив»/«мёртв». Рабочие ключи сохраняются в файл.
 """
 
 import json
@@ -274,7 +274,7 @@ def save_results_and_exit(available: list, all_metrics: dict, output_path: str, 
             last_line = lines[-1].strip()
             # Извлекаем чистую ссылку (до первого пробела или конца строки)
             link = last_line.split()[0] if last_line.split() else last_line
-            if link.startswith(('vless://', 'vmess://', 'trojan://', 'ss://')):
+            if link.startswith(('vless://', 'vmess://', 'trojan://', 'ss://', 'hysteria://', 'hysteria2://', 'hy2://')):
                 available_links.add(link)
     
     results_for_metrics = []
