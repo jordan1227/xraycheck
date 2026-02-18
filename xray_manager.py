@@ -302,6 +302,10 @@ def _download_xray_to(dir_path: str) -> str | None:
                 extracted = os.path.normpath(os.path.join(dir_path, info.filename))
                 if os.path.isfile(extracted):
                     try:
+                        os.chmod(extracted, 0o755)
+                    except OSError:
+                        pass
+                    try:
                         os.remove(zip_path)
                     except OSError:
                         pass
@@ -316,7 +320,12 @@ def _download_xray_to(dir_path: str) -> str | None:
         for root, _dirs, files in os.walk(dir_path):
             for f in files:
                 if f.lower() == exe_name or (exe_name == "xray" and f == "xray"):
-                    return os.path.abspath(os.path.join(root, f))
+                    path = os.path.abspath(os.path.join(root, f))
+                    try:
+                        os.chmod(path, 0o755)
+                    except OSError:
+                        pass
+                    return path
         console.print("[red]В архиве не найден исполняемый файл xray.[/red]")
         return None
     except requests.RequestException as e:
