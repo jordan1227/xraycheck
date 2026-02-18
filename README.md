@@ -154,3 +154,21 @@ chmod +x run_check.sh
 - **Свой URL списка:** `docker compose run --rm vless-checker "https://example.com/keys.txt"`
 - **Режим merge:** положите `links.txt` в каталог проекта (volume `.:/app`), задайте в `.env` `MODE=merge` и запустите `docker compose run --rm vless-checker`
 - Требуется `cap_add: NET_ADMIN` для iptables внутри контейнера
+
+## GitHub Actions: ежедневное обновление available.txt
+
+В репозитории настроен workflow **Daily VLESS check** (`.github/workflows/daily-check.yml`):
+
+- **Расписание:** раз в день в 03:15 UTC (cron).
+- **Действия:** запуск `vless_checker.py` в режиме `merge` (списки из `links.txt`), результат пишется в `available.txt`; при изменении файла коммит и push в текущую ветку.
+- **Ручной запуск:** вкладка Actions → «Daily VLESS check» → Run workflow.
+
+**Чтобы не публиковать `links.txt` в репозитории:** файл `links.txt` уже попадает под маску `*.txt` в `.gitignore`. В CI он создаётся из секрета. Добавьте в репозитории **Settings → Secrets and variables → Actions** секрет с именем **`LINKS_FILE_CONTENT`** и значением — содержимое вашего `links.txt` (по одной URL на строку). Workflow перед запуском проверки запишет этот секрет во временный `links.txt`. Если секрет не задан, шаг «Create links.txt from secret» завершится с ошибкой. Если `links.txt` уже был закоммичен ранее, удалите его из истории и добавьте секрет: `git rm --cached links.txt` и коммит.
+
+**Лимиты бесплатного использования:**
+
+- Публичные репозитории: минуты GitHub Actions не ограничены.
+- Один запуск в день + таймаут задания 50 минут — укладываемся в разумное использование.
+- Если новый запуск стартует до завершения предыдущего, предыдущий отменяется (`concurrency`).
+
+В workflow заданы переменные: `MODE=merge`, `OUTPUT_FILE=available.txt`, `MAX_WORKERS=16`, `EXPORT_FORMAT=txt`. Для других настроек можно добавить переменные окружения в секцию `env` файла workflow или использовать `.env` в репозитории (при необходимости завести его из `.env.example` и не коммитить секреты).

@@ -1,0 +1,69 @@
+# Ежедневная проверка VLESS-ключей и публикация available.txt
+# Лимиты: публичные репозитории — безлимитные минуты; один запуск в день + таймаут 50 мин
+
+name: Daily VLESS check
+
+on:
+  schedule:
+    # Раз в день в 03:15 UTC (меньше нагрузка, чем ровно в полночь)
+    - cron: '15 3 * * *'
+  workflow_dispatch:
+    # Ручной запуск из вкладки Actions
+
+concurrency:
+  group: daily-vless-check
+  cancel-in-progress: true
+
+env:
+  MODE: merge
+  LINKS_FILE: links.txt
+  OUTPUT_FILE: available.txt
+  OUTPUT_ADD_DATE: 'false'
+  # В CI уменьшаем число потоков, чтобы уложиться в таймаут и не перегружать runner
+  MAX_WORKERS: 16
+  EXPORT_FORMAT: txt
+  ENABLE_CACHE: 'false'
+
+jobs:
+  check-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create links.txt from secret
+        run: |
+          if [ -z "$LINKS_FILE_CONTENT" ]; then
+            echo "::error::Secret LINKS_FILE_CONTENT is not set. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          printf '%s' "$LINKS_FILE_CONTENT" > links.txt
+        env:
+          LINKS_FILE_CONTENT: ${{ secrets.LINKS_FILE_CONTENT }}
+
+      - name: Run vless_checker.py
+        run: python vless_checker.py
+
+      - name: Commit and push available.txt
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain available.txt)" ]; then
+            git add available.txt
+            git commit -m "chore: update available.txt [automated]"
+            git push
+          else
+            echo "available.txt unchanged, skip push"
+          fi
