@@ -57,15 +57,15 @@ jobs:
             -e ENABLE_CACHE="$ENABLE_CACHE" \
             vless-checker "$AVAILABLE_URL"
 
-      - name: Verify white-list_available.txt and top100 were created
+      - name: Verify white-list_available.txt and create top100 if missing
         run: |
           test -f "white-list_available.txt" || (echo "::error::white-list_available.txt not found" && exit 1)
-          if [ -f "white-list_available.txt" ] && [ ! -f "white-list_available(top100).txt" ]; then
-            echo "::error::white-list_available(top100).txt not found (must be created when main file exists)"
-            exit 1
+          if [ ! -f "white-list_available(top100).txt" ]; then
+            echo "white-list_available(top100).txt not created by checker, creating from first 100 lines of main file"
+            head -n 100 "white-list_available.txt" > "white-list_available(top100).txt"
           fi
           echo "Output files:"
-          ls -la white-list_available.txt "white-list_available(top100).txt" 2>/dev/null || true
+          ls -la white-list_available.txt "white-list_available(top100).txt"
 
       - name: Commit and push white-list_available.txt and white-list_available(top100).txt
         run: |

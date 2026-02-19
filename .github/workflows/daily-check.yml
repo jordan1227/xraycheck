@@ -7,9 +7,6 @@ on:
     - cron: '15 3 * * *'
   workflow_dispatch:
     # Ручной запуск из вкладки Actions
-  push:
-    branches: [main, master]
-    paths: ['.github/workflows/daily-check.yml']
 
 concurrency:
   group: daily-vless-check
