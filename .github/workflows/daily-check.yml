@@ -83,16 +83,17 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          CHANGED=
-          if [ -f "configs/available.txt" ] && [ -n "$(git status --porcelain configs/available.txt)" ]; then
+          # Создаем директорию configs если её нет
+          mkdir -p configs
+          # Добавляем файлы в git, если они существуют
+          if [ -f "configs/available.txt" ]; then
             git add configs/available.txt
-            CHANGED=1
           fi
-          if [ -f "configs/available(top100).txt" ] && [ -n "$(git status --porcelain 'configs/available(top100).txt')" ]; then
+          if [ -f "configs/available(top100).txt" ]; then
             git add "configs/available(top100).txt"
-            CHANGED=1
           fi
-          if [ -n "$CHANGED" ]; then
+          # Проверяем, есть ли изменения в индексе
+          if ! git diff --cached --quiet; then
             git commit -m "chore: update configs/available.txt and top100 [automated]"
             git pull --rebase origin "${{ github.ref_name }}"
             git push
