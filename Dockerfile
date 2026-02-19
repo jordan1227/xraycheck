@@ -25,11 +25,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY vless_checker.py docker_entrypoint.py ./
+COPY vless_checker.py ./
+COPY lib/ ./lib/
 
 # Путь к xray в контейнере
 ENV XRAY_PATH=/usr/local/bin/xray
 
-# Точка входа: настройка iptables по whitelist + хостам прокси, затем запуск скрипта
-ENTRYPOINT ["python", "docker_entrypoint.py"]
+# Точка входа: настройка iptables по whitelist + хостам прокси, затем запуск vless_checker.py
+ENTRYPOINT ["python", "-m", "lib.docker_entrypoint"]
 CMD []

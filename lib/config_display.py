@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from config import (
+from .config import (
     BASE_PORT,
     CHECK_GEOLOCATION,
     CONNECT_TIMEOUT,
@@ -23,7 +23,7 @@ from config import (
     REQUESTS_PER_URL,
     STABILITY_CHECKS,
     STRICT_MODE,
-    STRONG_DOUBLE_CHECK,
+    STRONG_ATTEMPTS,
     STRONG_MAX_RESPONSE_TIME,
     STRONG_STYLE_TEST,
     STRONG_STYLE_TIMEOUT,
@@ -35,7 +35,7 @@ from config import (
     XRAY_STARTUP_WAIT,
     _CLIENT_TEST_HTTPS,
 )
-from parsing import get_output_path
+from .parsing import get_output_path
 
 console = Console()
 
@@ -45,18 +45,17 @@ def print_current_config(list_url: str) -> None:
     output_path = get_output_path(list_url)
     ports_end = BASE_PORT + MAX_WORKERS - 1
     if STRONG_STYLE_TEST:
-        reqs = "два запроса" if STRONG_DOUBLE_CHECK else "один запрос"
+        reqs = f"{STRONG_ATTEMPTS} запроса подряд" if STRONG_ATTEMPTS != 1 else "1 запрос"
         test_urls_display = f"Строгий режим: {_CLIENT_TEST_HTTPS} ({reqs})"
     elif TEST_URLS:
         test_urls_display = ", ".join(TEST_URLS[:3]) + ("..." if len(TEST_URLS) > 3 else "")
     else:
         test_urls_display = TEST_URL if TEST_URL else "не задан"
-    
-    # Создаем таблицу с параметрами
+
     config_table = Table(show_header=False, box=None, padding=(0, 1))
     config_table.add_row("[cyan]Режим[/cyan]", f"[bold]{MODE}[/bold]")
     if STRONG_STYLE_TEST:
-        config_table.add_row("[cyan]Алгоритм[/cyan]", f"строгий ({'2 запроса' if STRONG_DOUBLE_CHECK else '1 запрос'})")
+        config_table.add_row("[cyan]Алгоритм[/cyan]", f"строгий ({STRONG_ATTEMPTS} запроса подряд)")
         config_table.add_row("[cyan]Таймаут запроса[/cyan]", f"{STRONG_STYLE_TIMEOUT} с (connect + read)")
         config_table.add_row("[cyan]Макс. время ответа[/cyan]", f"{STRONG_MAX_RESPONSE_TIME} с")
     config_table.add_row("[cyan]Список ключей[/cyan]", list_url)
@@ -82,6 +81,6 @@ def print_current_config(list_url: str) -> None:
     if ENABLE_CACHE:
         config_table.add_row("[cyan]Кэширование[/cyan]", "[green]включено[/green]")
     config_table.add_row("[cyan]Макс. задержка в файл[/cyan]", f"{MAX_LATENCY_MS} мс (серверы с задержкой выше не записываются)")
-    
+
     console.print(Panel(config_table, title="[bold cyan]Параметры проверки[/bold cyan]", border_style="cyan"))
     console.print()

@@ -30,9 +30,9 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from cache import load_cache, save_cache
-from checker import check_key_e2e
-from config import (
+from lib.cache import load_cache, save_cache
+from lib.checker import check_key_e2e
+from lib.config import (
     DEBUG_FIRST_FAIL,
     DEFAULT_LIST_URL,
     ENABLE_CACHE,
@@ -45,12 +45,12 @@ from config import (
     METRICS_FILE,
     MODE,
 )
-from config_display import print_current_config
-from export import export_to_csv, export_to_html, export_to_json
-from metrics import calculate_performance_metrics, print_statistics_table
-from parsing import decode_subscription_content, get_output_path, load_merged_keys, parse_proxy_lines, parse_proxy_url
-from signals import available_keys, interrupted, output_path_global
-from xray_manager import build_xray_config, ensure_xray
+from lib.config_display import print_current_config
+from lib.export import export_to_csv, export_to_html, export_to_json
+from lib.metrics import calculate_performance_metrics, print_statistics_table
+from lib.parsing import decode_subscription_content, get_output_path, load_merged_keys, parse_proxy_lines, parse_proxy_url
+from lib.signals import available_keys, interrupted, output_path_global
+from lib.xray_manager import build_xray_config, ensure_xray
 
 console = Console()
 
@@ -59,7 +59,7 @@ def main():
     global available_keys, output_path_global
     
     # Инициализация логирования
-    from logger_config import setup_logging
+    from lib.logger_config import setup_logging
     setup_logging(debug=False)
     
     args = [a for a in sys.argv[1:] if a.startswith("-")]
@@ -265,7 +265,7 @@ def main():
                         description=f"[cyan]Проверка ключей...[/cyan] [OK: {ok_count}, FAIL: {fail_count}{avg_time_str}]"
                     )
                 except Exception as e:
-                    from logger_config import logger
+                    from lib.logger_config import logger
                     logger.error(f"Ошибка проверки ключа: {e}")
                     fail_count = done - len(available)
                     progress.update(
@@ -308,6 +308,7 @@ def _create_top100_file(output_path: str, available_sorted: list[tuple[str, floa
     
     # Сохраняем top100 без префикса задержки (для публикации)
     top100_lines = [_strip_latency_prefix(item[0]) for item in top100]
+    top100_path.parent.mkdir(parents=True, exist_ok=True)
     with open(top100_path, "w", encoding="utf-8") as f:
         f.write("\n".join(top100_lines))
     
@@ -320,7 +321,7 @@ def save_results_and_exit(available: list[tuple[str, float]], all_metrics: dict,
     Сохраняет результаты и выводит статистику.
     available: список кортежей (отформатированная_строка, задержка_в_мс)
     """
-    from logger_config import logger
+    from lib.logger_config import logger
     
     # Сохранение кэша
     if cache is not None and ENABLE_CACHE:

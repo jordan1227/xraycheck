@@ -9,7 +9,7 @@ from typing import Optional
 
 import requests
 
-from config import (
+from .config import (
     CHECK_GEOLOCATION,
     CONNECT_TIMEOUT,
     GEOLOCATION_SERVICE,
@@ -37,11 +37,8 @@ def _get_geolocation(proxies: dict, service_url: str) -> Optional[dict]:
         r = requests.get(service_url, proxies=proxies, timeout=CONNECT_TIMEOUT)
         if r.status_code == 200:
             data = r.json()
-            # httpbin.org/ip возвращает {"origin": "ip"}
-            # Можно расширить для других сервисов
             if "origin" in data:
                 ip = data["origin"].split(",")[0].strip()
-                # Простая проверка IP (можно расширить с использованием ip-api.com или подобных)
                 return {"ip": ip}
             return data
     except Exception:
@@ -55,8 +52,6 @@ def _check_geolocation_allowed(geolocation: Optional[dict], allowed_countries: l
         return True
     if not geolocation:
         return False
-    # Простая проверка (можно расширить с реальным API геолокации)
-    # Здесь мы просто проверяем наличие IP
     return "ip" in geolocation
 
 
@@ -96,7 +91,6 @@ def check_response_valid(
     Для URL вида generate_204 (как в клиентах SagerNet и др.) требуется код 204."""
     if not response:
         return False
-    # Клиенты (v2rayNG, SagerNet и др.) для generate_204 ожидают именно 204 и пустое тело (No Content)
     if "generate_204" in (url or ""):
         if response.status_code != 204:
             return False

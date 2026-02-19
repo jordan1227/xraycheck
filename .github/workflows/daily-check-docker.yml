@@ -15,6 +15,7 @@ env:
   MODE: single
   LINKS_FILE: links.txt
   OUTPUT_FILE: white-list_available.txt
+  OUTPUT_DIR: configs
   OUTPUT_ADD_DATE: 'false'
   MAX_WORKERS: 200
   EXPORT_FORMAT: txt
@@ -23,9 +24,10 @@ env:
   TEST_URLS_HTTPS: https://www.gstatic.com/generate_204
   REQUIRE_HTTPS: 'true'
   STRONG_STYLE_TEST: 'true'
-  STRONG_STYLE_TIMEOUT: 30
-  STRONG_MAX_RESPONSE_TIME: 5
+  STRONG_STYLE_TIMEOUT: 12
+  STRONG_MAX_RESPONSE_TIME: 3
   STRONG_DOUBLE_CHECK: 'true'
+  STRONG_ATTEMPTS: 3
   REQUESTS_PER_URL: 2
   MIN_SUCCESSFUL_REQUESTS: 2
   MIN_SUCCESSFUL_URLS: 2
@@ -36,7 +38,7 @@ env:
   MAX_RETRIES: 1
   MAX_RESPONSE_TIME: 6
   MIN_RESPONSE_SIZE: 0
-  MAX_LATENCY_MS: 3000
+  MAX_LATENCY_MS: 2000
   VERIFY_HTTPS_SSL: 'false'
   STABILITY_CHECKS: 2
   STABILITY_CHECK_DELAY: 2.0
@@ -70,11 +72,12 @@ jobs:
 
       - name: Run checker in Docker (input = available.txt from main)
         env:
-          AVAILABLE_URL: https://raw.githubusercontent.com/${{ github.repository }}/main/available.txt
+          AVAILABLE_URL: https://raw.githubusercontent.com/${{ github.repository }}/main/configs/available.txt
         run: |
           touch .before-docker-run
           docker compose run --rm \
             -e OUTPUT_FILE="$OUTPUT_FILE" \
+            -e OUTPUT_DIR="$OUTPUT_DIR" \
             -e MODE="$MODE" \
             -e OUTPUT_ADD_DATE="$OUTPUT_ADD_DATE" \
             -e MAX_WORKERS="$MAX_WORKERS" \
@@ -87,6 +90,7 @@ jobs:
             -e STRONG_STYLE_TIMEOUT="$STRONG_STYLE_TIMEOUT" \
             -e STRONG_MAX_RESPONSE_TIME="$STRONG_MAX_RESPONSE_TIME" \
             -e STRONG_DOUBLE_CHECK="$STRONG_DOUBLE_CHECK" \
+            -e STRONG_ATTEMPTS="$STRONG_ATTEMPTS" \
             -e REQUESTS_PER_URL="$REQUESTS_PER_URL" \
             -e MIN_SUCCESSFUL_REQUESTS="$MIN_SUCCESSFUL_REQUESTS" \
             -e MIN_SUCCESSFUL_URLS="$MIN_SUCCESSFUL_URLS" \
@@ -106,37 +110,38 @@ jobs:
             -e TEST_POST_REQUESTS="$TEST_POST_REQUESTS" \
             vless-checker "$AVAILABLE_URL"
 
-      - name: Verify white-list_available.txt and create top100 if missing
+      - name: Verify configs/white-list_available.txt and create top100 if missing
         run: |
-          test -f "white-list_available.txt" || (echo "::error::white-list_available.txt not found" && exit 1)
-          if [ -f .before-docker-run ] && [ .before-docker-run -nt "white-list_available.txt" ]; then
-            echo "::warning::white-list_available.txt was not updated by Docker (0 results or checker wrote elsewhere), using existing file"
+          test -f "configs/white-list_available.txt" || (echo "::error::configs/white-list_available.txt not found" && exit 1)
+          if [ -f .before-docker-run ] && [ .before-docker-run -nt "configs/white-list_available.txt" ]; then
+            echo "::warning::configs/white-list_available.txt was not updated by Docker (0 results or checker wrote elsewhere), using existing file"
           fi
-          if [ ! -f "white-list_available(top100).txt" ]; then
-            echo "white-list_available(top100).txt not created by checker, creating from first 100 lines of main file"
-            head -n 100 "white-list_available.txt" > "white-list_available(top100).txt"
+          if [ ! -f "configs/white-list_available(top100).txt" ]; then
+            echo "configs/white-list_available(top100).txt not created by checker, creating from first 100 lines of main file"
+            mkdir -p configs
+            head -n 100 "configs/white-list_available.txt" > "configs/white-list_available(top100).txt"
           fi
           rm -f .before-docker-run
           echo "Output files:"
-          ls -la white-list_available.txt "white-list_available(top100).txt"
+          ls -la configs/white-list_available.txt "configs/white-list_available(top100).txt"
 
-      - name: Commit and push white-list_available.txt and white-list_available(top100).txt
+      - name: Commit and push configs/white-list_available.txt and configs/white-list_available(top100).txt
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           CHANGED=
-          if [ -n "$(git status --porcelain white-list_available.txt)" ]; then
-            git add white-list_available.txt
+          if [ -f "configs/white-list_available.txt" ] && [ -n "$(git status --porcelain configs/white-list_available.txt)" ]; then
+            git add configs/white-list_available.txt
             CHANGED=1
           fi
-          if [ -f "white-list_available(top100).txt" ] && [ -n "$(git status --porcelain 'white-list_available(top100).txt')" ]; then
-            git add "white-list_available(top100).txt"
+          if [ -f "configs/white-list_available(top100).txt" ] && [ -n "$(git status --porcelain 'configs/white-list_available(top100).txt')" ]; then
+            git add "configs/white-list_available(top100).txt"
             CHANGED=1
           fi
           if [ -n "$CHANGED" ]; then
-            git commit -m "chore: update white-list_available.txt and top100 [Docker, automated]"
+            git commit -m "chore: update configs/white-list_available.txt and top100 [Docker, automated]"
             git pull --rebase origin "${{ github.ref_name }}"
             git push
           else
-            echo "white-list_available.txt and top100 unchanged, skip push"
+            echo "configs/white-list_available.txt and top100 unchanged, skip push"
           fi

@@ -6,9 +6,8 @@
 
 import threading
 
-from config import BASE_PORT, MAX_WORKERS
+from .config import BASE_PORT, MAX_WORKERS
 
-# Пул портов для SOCKS (по одному на поток)
 _port_lock = threading.Lock()
 _port_pool = list(range(BASE_PORT, BASE_PORT + MAX_WORKERS))
 

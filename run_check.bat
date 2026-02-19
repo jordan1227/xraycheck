@@ -143,6 +143,15 @@ if not exist "docker-compose.yml" (
     exit /b 1
 )
 
+REM Пересобираем Docker образ (чтобы использовать новую структуру с lib/)
+echo [INFO] Пересборка Docker образа...
+!DOCKER_COMPOSE_CMD! build --no-cache
+if errorlevel 1 (
+    echo [ERROR] Ошибка при сборке Docker образа!
+    pause
+    exit /b 1
+)
+
 REM Запускаем Docker контейнер
 echo [SUCCESS] Запуск Docker контейнера...
 !DOCKER_COMPOSE_CMD! run --rm vless-checker %*

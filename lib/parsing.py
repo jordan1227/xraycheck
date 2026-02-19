@@ -11,7 +11,7 @@ import requests
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs, unquote
 
-from config import OUTPUT_ADD_DATE, OUTPUT_FILE
+from .config import OUTPUT_ADD_DATE, OUTPUT_DIR, OUTPUT_FILE
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -32,18 +32,18 @@ def get_source_name(url_or_path: str) -> str:
 
 
 def get_output_path(list_url: str) -> str:
-    """Имя файла результата: при OUTPUT_ADD_DATE=false - OUTPUT_FILE как есть; иначе база + (источник_ДДММГГГГ).txt."""
+    """Путь к файлу результата: OUTPUT_DIR/имя; при OUTPUT_ADD_DATE=false - OUTPUT_FILE как есть; иначе база + (источник_ДДММГГГГ).txt."""
     if not OUTPUT_ADD_DATE:
         base, ext = os.path.splitext(OUTPUT_FILE)
-        return f"{base or 'available'}{ext or '.txt'}"
-    base, ext = os.path.splitext(OUTPUT_FILE)
-    if not base:
-        base = "available"
-    if not ext:
-        ext = ".txt"
-    source = get_source_name(list_url)
-    date = datetime.now().strftime("%d%m%Y")
-    return f"{base} ({source}_{date}){ext}"
+        name = f"{base or 'available'}{ext or '.txt'}"
+    else:
+        base, ext = os.path.splitext(OUTPUT_FILE)
+        base = base or "available"
+        ext = ext or ".txt"
+        source = get_source_name(list_url)
+        date = datetime.now().strftime("%d%m%Y")
+        name = f"{base} ({source}_{date}){ext}"
+    return os.path.join(OUTPUT_DIR, name) if OUTPUT_DIR else name
 
 
 # Префиксы протоколов для проверки «уже раскодировано»
@@ -61,13 +61,13 @@ def _content_has_protocol_lines(text: str) -> bool:
 
 def decode_subscription_content(text: str) -> str:
     """
-    Декодирует контент подписки: если текст — base64 (типично для ссылок вроде nowmeow.pw/.../whitelist
+    Декодирует контент подписки: если текст - base64 (типично для ссылок вроде nowmeow.pw/.../whitelist
     или gitverse.ru/.../whitelist.txt), возвращает раскодированный текст. Иначе возвращает исходный.
     """
     if not text or not text.strip():
         return text
     text = text.strip()
-    # Уже есть ссылки с протоколами — не трогаем
+    # Уже есть ссылки с протоколами - не трогаем
     if _content_has_protocol_lines(text):
         return text
     # Убираем переносы строк внутри base64 (некоторые серверы отдают с переносами)

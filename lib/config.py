@@ -8,6 +8,7 @@ import os
 import urllib3
 from dotenv import load_dotenv
 
+# Загружаем .env из корня проекта (текущая рабочая директория при запуске vless_checker.py)
 load_dotenv()
 
 # GitHub API для загрузки Xray-core
@@ -44,6 +45,8 @@ MODE = (_env("MODE", "single").strip().lower() or "single")
 LINKS_FILE = _env("LINKS_FILE", "links.txt")
 DEFAULT_LIST_URL = _env("DEFAULT_LIST_URL", "https://raw.githubusercontent.com/EtoNeYaProject/etoneyaproject.github.io/refs/heads/main/cidr")
 OUTPUT_FILE = _env("OUTPUT_FILE", "available.txt")
+# Директория для сохранения результатов проверки (txt, top100)
+OUTPUT_DIR = _env("OUTPUT_DIR", "configs")
 # Добавлять к имени файла дату и источник (OUTPUT_FILE без даты при false)
 OUTPUT_ADD_DATE = _env_bool("OUTPUT_ADD_DATE", False)
 
@@ -119,11 +122,13 @@ STABILITY_CHECK_DELAY = _env_float("STABILITY_CHECK_DELAY", 2.0)
 STRICT_MODE = _env_bool("STRICT_MODE", False)
 STRICT_MODE_REQUIRE_ALL = _env_bool("STRICT_MODE_REQUIRE_ALL", True)
 
-# Строгий режим проверки (STRONG STYLE)
+# Строгий режим проверки (STRONG STYLE), как в мобильных клиентах
 STRONG_STYLE_TEST = _env_bool("STRONG_STYLE_TEST", False)
-STRONG_STYLE_TIMEOUT = _env_int("STRONG_STYLE_TIMEOUT", 30)
-STRONG_MAX_RESPONSE_TIME = _env_int("STRONG_MAX_RESPONSE_TIME", 5)
+STRONG_STYLE_TIMEOUT = _env_int("STRONG_STYLE_TIMEOUT", 12)
+STRONG_MAX_RESPONSE_TIME = _env_int("STRONG_MAX_RESPONSE_TIME", 3)
 STRONG_DOUBLE_CHECK = _env_bool("STRONG_DOUBLE_CHECK", True)
+# Сколько подряд успешных запросов к gstatic/generate_204 требуется (3 = строже, меньше ложных «доступных»)
+STRONG_ATTEMPTS = _env_int("STRONG_ATTEMPTS", 3)
 
 # Производительность
 MAX_WORKERS = _env_int("MAX_WORKERS", 120)

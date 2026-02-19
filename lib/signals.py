@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 if TYPE_CHECKING:
-    from xray_manager import kill_xray_process
+    from .xray_manager import kill_xray_process
 
 console = Console()
 
@@ -37,8 +37,8 @@ def signal_handler(signum, frame):
 def cleanup_processes():
     """Корректно завершает все активные процессы xray."""
     # Импортируем здесь, чтобы избежать циклических зависимостей
-    from xray_manager import kill_xray_process
-    from port_pool import return_port
+    from .xray_manager import kill_xray_process
+    from .port_pool import return_port
     
     for proc, port in active_processes:
         kill_xray_process(proc)

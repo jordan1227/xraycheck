@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from config import ENABLE_CACHE, CACHE_FILE, CACHE_TTL
+from .config import ENABLE_CACHE, CACHE_FILE, CACHE_TTL
 
 
 def get_key_hash(vless_line: str) -> str:
@@ -28,7 +28,6 @@ def load_cache() -> dict:
     try:
         with open(cache_path, 'r', encoding='utf-8') as f:
             cache = json.load(f)
-        # Удаляем устаревшие записи
         current_time = time.time()
         return {
             k: v for k, v in cache.items()

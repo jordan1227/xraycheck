@@ -13,8 +13,8 @@ import tempfile
 import time
 from typing import Optional
 
-from cache import check_cache, get_key_hash
-from config import (
+from .cache import check_cache, get_key_hash
+from .config import (
     ALLOWED_COUNTRIES,
     CHECK_GEOLOCATION,
     CONNECT_TIMEOUT,
@@ -35,7 +35,7 @@ from config import (
     STABILITY_CHECKS,
     STRICT_MODE,
     STRICT_MODE_REQUIRE_ALL,
-    STRONG_DOUBLE_CHECK,
+    STRONG_ATTEMPTS,
     STRONG_MAX_RESPONSE_TIME,
     STRONG_STYLE_TEST,
     STRONG_STYLE_TIMEOUT,
@@ -49,11 +49,11 @@ from config import (
     _CLIENT_TEST_HTTPS,
 )
 import logging
-from logger_config import should_debug as should_debug_func
+from .logger_config import should_debug as should_debug_func
 
 logger = logging.getLogger(__name__)
-from parsing import parse_proxy_url, parse_vless_url
-from port_pool import return_port, take_port
+from .parsing import parse_proxy_url, parse_vless_url
+from .port_pool import return_port, take_port
 
 
 def _check_hysteria_reachable(address: str, port: int, timeout: float) -> tuple[bool, float]:
@@ -69,15 +69,15 @@ def _check_hysteria_reachable(address: str, port: int, timeout: float) -> tuple[
             return (True, elapsed)
     except (socket.error, socket.gaierror, OSError):
         return (False, timeout)  # При ошибке возвращаем таймаут как задержку
-from signals import active_processes
-from utils import (
+from .signals import active_processes
+from .utils import (
     check_geolocation_allowed,
     check_response_valid,
     get_geolocation,
     is_connection_error,
     make_request,
 )
-from xray_manager import build_xray_config, kill_xray_process, run_xray
+from .xray_manager import build_xray_config, kill_xray_process, run_xray
 
 logger = logging.getLogger(__name__)
 
@@ -187,18 +187,19 @@ def check_key_e2e(vless_line: str, debug: bool = False, cache: Optional[dict] = 
         # Определяем таймаут
         timeout = CONNECT_TIMEOUT_SLOW if USE_ADAPTIVE_TIMEOUT else CONNECT_TIMEOUT
         
-        # Строгий режим: один или два запроса к одному URL, без повторов; лимит времени как в мобильном клиенте
+        # Строгий режим: N запросов к gstatic/generate_204 подряд, без повторов; таймаут как в мобильном клиенте
         if STRONG_STYLE_TEST:
             test_url = _CLIENT_TEST_HTTPS
             max_ok_time = STRONG_MAX_RESPONSE_TIME if STRONG_MAX_RESPONSE_TIME > 0 else MAX_RESPONSE_TIME
-            connect_t = min(10, max(5, STRONG_STYLE_TIMEOUT // 3))
-            read_t = max(15, STRONG_STYLE_TIMEOUT - connect_t)
+            # Таймаут одного запроса: STRONG_STYLE_TIMEOUT - общее время (connect + read), без завышения
+            connect_t = max(3, min(10, int(STRONG_STYLE_TIMEOUT * 0.4)))
+            read_t = max(5, STRONG_STYLE_TIMEOUT - connect_t)
             timeout_strong = (connect_t, read_t)
-            attempts_needed = 2 if STRONG_DOUBLE_CHECK else 1
+            attempts_needed = max(1, STRONG_ATTEMPTS)
             last_elapsed = 0.0
             for attempt in range(attempts_needed):
                 if attempt > 0:
-                    time.sleep(0.3)
+                    time.sleep(0.5)
                 response, elapsed_time, error = make_request(test_url, proxies, timeout_strong)
                 metrics["total_requests"] = metrics.get("total_requests", 0) + 1
                 if response and not error and check_response_valid(response, 0, test_url):
@@ -221,7 +222,7 @@ def check_key_e2e(vless_line: str, debug: bool = False, cache: Optional[dict] = 
             metrics["failed_urls"] = 0
             active_processes.remove((proc, port))
             return (vless_line, True, metrics)
-        
+
         # Собираем все URL для проверки
         all_urls = []
         if TEST_URLS:

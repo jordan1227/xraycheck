@@ -17,8 +17,8 @@ import zipfile
 import requests
 from rich.console import Console
 
-import config
-from config import (
+from . import config
+from .config import (
     XRAY_DIR_NAME,
     XRAY_RELEASES_API,
     XRAY_STARTUP_POLL_INTERVAL,
@@ -344,23 +344,25 @@ def ensure_xray() -> bool:
     Убеждается, что xray доступен: проверяет PATH, затем локальную папку xray_dist,
     при необходимости скачивает Xray-core с GitHub. Возвращает True, если xray готов к использованию.
     """
-    import config
     if os.environ.get("XRAY_PATH"):
         return check_xray_available()
     if check_xray_available():
         return True
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    xray_dir = os.path.join(script_dir, XRAY_DIR_NAME)
+    from pathlib import Path
+    script_dir = Path(__file__).resolve().parent
+    if script_dir.name == "lib":
+        script_dir = script_dir.parent
+    xray_dir = script_dir / XRAY_DIR_NAME
     exe_name = "xray.exe" if sys.platform == "win32" else "xray"
-    local_path = os.path.join(xray_dir, exe_name)
+    local_path = str(xray_dir / exe_name)
     if os.path.isfile(local_path):
         # Используем глобальную переменную из config
         config.XRAY_CMD = local_path
         if check_xray_available():
             console.print(f"[green]✓[/green] Используется локальный Xray: {local_path}\n")
             return True
-    os.makedirs(xray_dir, exist_ok=True)
-    path = _download_xray_to(xray_dir)
+    os.makedirs(str(xray_dir), exist_ok=True)
+    path = _download_xray_to(str(xray_dir))
     if path:
         config.XRAY_CMD = path
         if check_xray_available():

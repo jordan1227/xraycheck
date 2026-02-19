@@ -16,6 +16,7 @@ env:
   MODE: merge
   LINKS_FILE: links.txt
   OUTPUT_FILE: available.txt
+  OUTPUT_DIR: configs
   OUTPUT_ADD_DATE: 'false'
   MAX_WORKERS: 200
   EXPORT_FORMAT: txt
@@ -24,9 +25,10 @@ env:
   TEST_URLS_HTTPS: https://www.gstatic.com/generate_204
   REQUIRE_HTTPS: 'true'
   STRONG_STYLE_TEST: 'true'
-  STRONG_STYLE_TIMEOUT: 30
-  STRONG_MAX_RESPONSE_TIME: 5
+  STRONG_STYLE_TIMEOUT: 12
+  STRONG_MAX_RESPONSE_TIME: 3
   STRONG_DOUBLE_CHECK: 'true'
+  STRONG_ATTEMPTS: 3
   REQUESTS_PER_URL: 2
   MIN_SUCCESSFUL_REQUESTS: 2
   MIN_SUCCESSFUL_URLS: 2
@@ -37,7 +39,7 @@ env:
   MAX_RETRIES: 1
   MAX_RESPONSE_TIME: 6
   MIN_RESPONSE_SIZE: 0
-  MAX_LATENCY_MS: 3000
+  MAX_LATENCY_MS: 2000
   VERIFY_HTTPS_SSL: 'false'
   STABILITY_CHECKS: 2
   STABILITY_CHECK_DELAY: 2.0
@@ -77,23 +79,23 @@ jobs:
       - name: Run vless_checker.py
         run: python vless_checker.py
 
-      - name: Commit and push available.txt and available(top100).txt
+      - name: Commit and push configs/available.txt and configs/available(top100).txt
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           CHANGED=
-          if [ -n "$(git status --porcelain available.txt)" ]; then
-            git add available.txt
+          if [ -f "configs/available.txt" ] && [ -n "$(git status --porcelain configs/available.txt)" ]; then
+            git add configs/available.txt
             CHANGED=1
           fi
-          if [ -f "available(top100).txt" ] && [ -n "$(git status --porcelain 'available(top100).txt')" ]; then
-            git add "available(top100).txt"
+          if [ -f "configs/available(top100).txt" ] && [ -n "$(git status --porcelain 'configs/available(top100).txt')" ]; then
+            git add "configs/available(top100).txt"
             CHANGED=1
           fi
           if [ -n "$CHANGED" ]; then
-            git commit -m "chore: update available.txt and top100 [automated]"
+            git commit -m "chore: update configs/available.txt and top100 [automated]"
             git pull --rebase origin "${{ github.ref_name }}"
             git push
           else
-            echo "available.txt and top100 unchanged, skip push"
+            echo "configs/available.txt and top100 unchanged, skip push"
           fi

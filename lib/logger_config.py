@@ -8,7 +8,7 @@ import logging
 import sys
 from typing import Optional
 
-from config import LOG_LEVEL, LOG_FILE, LOG_MAX_SIZE, LOG_BACKUP_COUNT
+from .config import LOG_LEVEL, LOG_FILE, LOG_MAX_SIZE, LOG_BACKUP_COUNT
 
 # Глобальный флаг для отладки первого ключа (не влияет на уровень логирования)
 _debug_first_key = False
@@ -28,9 +28,9 @@ def setup_logging(debug: bool = False, log_file: Optional[str] = None):
     # Уровень логирования определяется только из LOG_LEVEL
     level = level_map.get(LOG_LEVEL, logging.INFO)
     _debug_first_key = debug and LOG_LEVEL == "DEBUG"  # Только если уровень DEBUG
-    
+
     handlers = [logging.StreamHandler(sys.stdout)]
-    
+
     if log_file or LOG_FILE:
         log_path = log_file or LOG_FILE
         from logging.handlers import RotatingFileHandler
@@ -38,7 +38,7 @@ def setup_logging(debug: bool = False, log_file: Optional[str] = None):
             log_path, maxBytes=LOG_MAX_SIZE, backupCount=LOG_BACKUP_COUNT, encoding='utf-8'
         )
         handlers.append(file_handler)
-    
+
     logging.basicConfig(
         level=level,
         format='%(asctime)s [%(levelname)s] %(message)s',
