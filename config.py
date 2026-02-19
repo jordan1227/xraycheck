@@ -99,6 +99,8 @@ RETRY_DELAY_MULTIPLIER = _env_float("RETRY_DELAY_MULTIPLIER", 2.0)
 MAX_RESPONSE_TIME = _env_float("MAX_RESPONSE_TIME", 0)
 MIN_RESPONSE_SIZE = _env_int("MIN_RESPONSE_SIZE", 0)
 VERIFY_HTTPS_SSL = _env_bool("VERIFY_HTTPS_SSL", False)
+# Максимальная задержка (мс): серверы с задержкой выше не попадают в available.txt / white-list_available.txt
+MAX_LATENCY_MS = _env_int("MAX_LATENCY_MS", 3000)
 
 if not VERIFY_HTTPS_SSL:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

@@ -46,8 +46,50 @@ def get_output_path(list_url: str) -> str:
     return f"{base} ({source}_{date}){ext}"
 
 
+# Префиксы протоколов для проверки «уже раскодировано»
+_SUBSCRIPTION_PROTOCOLS = ("vless://", "vmess://", "trojan://", "ss://", "hysteria://", "hysteria2://", "hy2://")
+
+
+def _content_has_protocol_lines(text: str) -> bool:
+    """Проверяет, есть ли в тексте строки, начинающиеся с известного протокола."""
+    for line in text.splitlines():
+        line = line.strip()
+        if any(line.startswith(p) for p in _SUBSCRIPTION_PROTOCOLS):
+            return True
+    return False
+
+
+def decode_subscription_content(text: str) -> str:
+    """
+    Декодирует контент подписки: если текст — base64 (типично для ссылок вроде nowmeow.pw/.../whitelist
+    или gitverse.ru/.../whitelist.txt), возвращает раскодированный текст. Иначе возвращает исходный.
+    """
+    if not text or not text.strip():
+        return text
+    text = text.strip()
+    # Уже есть ссылки с протоколами — не трогаем
+    if _content_has_protocol_lines(text):
+        return text
+    # Убираем переносы строк внутри base64 (некоторые серверы отдают с переносами)
+    raw = "".join(text.split())
+    for encoding in (base64.standard_b64decode, base64.urlsafe_b64decode):
+        try:
+            padded = raw
+            if len(padded) % 4:
+                padded += "=" * (4 - len(padded) % 4)
+            decoded = encoding(padded)
+            if isinstance(decoded, bytes):
+                decoded = decoded.decode("utf-8", errors="replace")
+            decoded = decoded.strip()
+            if decoded and _content_has_protocol_lines(decoded):
+                return decoded
+        except Exception:
+            continue
+    return text
+
+
 def fetch_list(url: str) -> str:
-    """Загружает текст списка по URL."""
+    """Загружает текст списка по URL. Поддерживает ответ в base64 (формат подписок)."""
     # Валидация URL перед использованием
     try:
         parsed = urlparse(url)
@@ -61,7 +103,7 @@ def fetch_list(url: str) -> str:
     
     r = requests.get(url, timeout=15)
     r.raise_for_status()
-    return r.text
+    return decode_subscription_content(r.text)
 
 
 def load_urls_from_file(path: str) -> list[str]:

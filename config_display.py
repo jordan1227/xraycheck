@@ -14,6 +14,7 @@ from config import (
     CONNECT_TIMEOUT,
     CONNECT_TIMEOUT_SLOW,
     ENABLE_CACHE,
+    MAX_LATENCY_MS,
     MAX_RESPONSE_TIME,
     MAX_RETRIES,
     MAX_WORKERS,
@@ -80,6 +81,7 @@ def print_current_config(list_url: str) -> None:
     config_table.add_row("[cyan]Ожидание xray[/cyan]", f"{XRAY_STARTUP_WAIT} с (проверка каждые {XRAY_STARTUP_POLL_INTERVAL} с)")
     if ENABLE_CACHE:
         config_table.add_row("[cyan]Кэширование[/cyan]", "[green]включено[/green]")
+    config_table.add_row("[cyan]Макс. задержка в файл[/cyan]", f"{MAX_LATENCY_MS} мс (серверы с задержкой выше не записываются)")
     
     console.print(Panel(config_table, title="[bold cyan]Параметры проверки[/bold cyan]", border_style="cyan"))
     console.print()

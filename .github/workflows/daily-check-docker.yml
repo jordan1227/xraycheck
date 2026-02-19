@@ -61,14 +61,32 @@ jobs:
             -e ENABLE_CACHE="$ENABLE_CACHE" \
             vless-checker "$AVAILABLE_URL"
 
-      - name: Commit and push white-list_available.txt
+      - name: Verify white-list_available.txt and top100 were created
+        run: |
+          test -f "white-list_available.txt" || (echo "::error::white-list_available.txt not found" && exit 1)
+          if [ -f "white-list_available.txt" ] && [ ! -f "white-list_available (top100).txt" ]; then
+            echo "::error::white-list_available (top100).txt not found (must be created when main file exists)"
+            exit 1
+          fi
+          echo "Output files:"
+          ls -la white-list_available.txt "white-list_available (top100).txt" 2>/dev/null || true
+
+      - name: Commit and push white-list_available.txt and white-list_available (top100).txt
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          CHANGED=
           if [ -n "$(git status --porcelain white-list_available.txt)" ]; then
             git add white-list_available.txt
-            git commit -m "chore: update white-list_available.txt [Docker, automated]"
+            CHANGED=1
+          fi
+          if [ -f "white-list_available (top100).txt" ] && [ -n "$(git status --porcelain 'white-list_available (top100).txt')" ]; then
+            git add "white-list_available (top100).txt"
+            CHANGED=1
+          fi
+          if [ -n "$CHANGED" ]; then
+            git commit -m "chore: update white-list_available.txt and top100 [Docker, automated]"
             git push
           else
-            echo "white-list_available.txt unchanged, skip push"
+            echo "white-list_available.txt and top100 unchanged, skip push"
           fi

@@ -56,16 +56,19 @@ from parsing import parse_proxy_url, parse_vless_url
 from port_pool import return_port, take_port
 
 
-def _check_hysteria_reachable(address: str, port: int, timeout: float) -> bool:
+def _check_hysteria_reachable(address: str, port: int, timeout: float) -> tuple[bool, float]:
     """
     Проверка доступности сервера Hysteria/Hysteria2 по TCP (порт открыт).
     Полная E2E-проверка через прокси требует отдельного клиента (Xray не поддерживает Hysteria).
+    Возвращает (доступен, задержка_в_секундах).
     """
     try:
+        start_time = time.perf_counter()
         with socket.create_connection((address, port), timeout=timeout):
-            return True
+            elapsed = time.perf_counter() - start_time
+            return (True, elapsed)
     except (socket.error, socket.gaierror, OSError):
-        return False
+        return (False, timeout)  # При ошибке возвращаем таймаут как задержку
 from signals import active_processes
 from utils import (
     check_geolocation_allowed,
@@ -125,7 +128,10 @@ def check_key_e2e(vless_line: str, debug: bool = False, cache: Optional[dict] = 
     # Hysteria/Hysteria2: Xray не поддерживает; проверяем только доступность хоста по TCP
     if parsed.get("protocol") in ("hysteria", "hysteria2"):
         timeout = CONNECT_TIMEOUT_SLOW if USE_ADAPTIVE_TIMEOUT else CONNECT_TIMEOUT
-        ok = _check_hysteria_reachable(parsed["address"], parsed["port"], float(timeout))
+        ok, latency = _check_hysteria_reachable(parsed["address"], parsed["port"], float(timeout))
+        # Сохраняем задержку в метрики для сортировки
+        if ok:
+            metrics["response_times"] = [latency]
         if cache is not None and ENABLE_CACHE:
             key_hash = get_key_hash(vless_line)
             cache[key_hash] = {"result": ok, "timestamp": time.time()}

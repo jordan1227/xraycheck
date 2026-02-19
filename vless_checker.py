@@ -39,6 +39,7 @@ from config import (
     LINKS_FILE,
     LOG_METRICS,
     LOG_RESPONSE_TIME,
+    MAX_LATENCY_MS,
     MAX_WORKERS,
     METRICS_FILE,
     MODE,
@@ -46,7 +47,7 @@ from config import (
 from config_display import print_current_config
 from export import export_to_csv, export_to_html, export_to_json
 from metrics import calculate_performance_metrics, print_statistics_table
-from parsing import get_output_path, load_merged_keys, parse_proxy_lines, parse_proxy_url
+from parsing import decode_subscription_content, get_output_path, load_merged_keys, parse_proxy_lines, parse_proxy_url
 from signals import available_keys, interrupted, output_path_global
 from xray_manager import build_xray_config, ensure_xray
 
@@ -93,6 +94,8 @@ def main():
         except (requests.RequestException, OSError) as e:
             console.print(f"[bold red]Ошибка загрузки списка:[/bold red] {e}")
             sys.exit(1)
+        # Поддержка подписок в base64 (ссылки вроде nowmeow.pw/.../whitelist, gitverse.ru/.../whitelist.txt)
+        text = decode_subscription_content(text)
         keys = parse_proxy_lines(text)
 
     output_path = get_output_path(list_url)
@@ -134,19 +137,33 @@ def main():
     links_only = [link for link, _ in keys]
     total = len(links_only)
 
-    available: list[str] = []
-    available_keys = available  # Для глобального доступа в обработчике сигналов
+    available: list[tuple[str, float]] = []  # Список (отформатированная_строка, задержка_мс)
+    available_keys = []  # Для глобального доступа в обработчике сигналов (список строк)
     all_metrics: dict[str, dict] = {}
     time_start = time.perf_counter()
     
     # Загрузка кэша
     cache = load_cache() if ENABLE_CACHE else None
 
-    def format_key_with_metadata(link: str, metrics: Optional[dict]) -> str:
-        """Форматирует ключ с метаданными для сохранения."""
+    def format_key_with_metadata(link: str, metrics: Optional[dict]) -> tuple[str, float]:
+        """
+        Форматирует ключ с метаданными для сохранения.
+        Возвращает (отформатированная_строка, задержка_в_мс).
+        Задержка используется для сортировки (0 если нет данных).
+        """
         full_line = link_to_full.get(link, link)
+        
+        # Вычисляем среднюю задержку в мс
+        avg_latency_ms = 0.0
+        if metrics and metrics.get("response_times"):
+            avg_time_sec = sum(metrics["response_times"]) / len(metrics["response_times"])
+            avg_latency_ms = avg_time_sec * 1000  # Конвертируем в миллисекунды
+        
+        # Если метаданные не нужны или нет метрик, возвращаем простую строку с префиксом задержки
         if not metrics or not LOG_RESPONSE_TIME:
-            return full_line
+            # Добавляем задержку в начало строки: [latency_ms] link
+            formatted = f"[{int(avg_latency_ms)}ms] {full_line}"
+            return (formatted, avg_latency_ms)
         
         metadata_lines = []
         metadata_lines.append(f"# Проверено: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -155,7 +172,10 @@ def main():
             avg_time = sum(metrics["response_times"]) / len(metrics["response_times"])
             min_time = min(metrics["response_times"])
             max_time = max(metrics["response_times"])
-            metadata_lines.append(f"# Время ответа: мин={min_time:.2f}с, макс={max_time:.2f}с, среднее={avg_time:.2f}с")
+            avg_ms = avg_time * 1000
+            min_ms = min_time * 1000
+            max_ms = max_time * 1000
+            metadata_lines.append(f"# Задержка: мин={min_ms:.0f}мс, макс={max_ms:.0f}мс, среднее={avg_ms:.0f}мс")
         
         if metrics.get("geolocation"):
             geo = metrics["geolocation"]
@@ -168,7 +188,9 @@ def main():
         if metrics.get("successful_requests") is not None:
             metadata_lines.append(f"# Успешных запросов: {metrics['successful_requests']}/{metrics.get('total_requests', 0)}")
         
-        return "\n".join(metadata_lines) + "\n" + full_line
+        # Формируем строку с метаданными и ссылкой
+        formatted = "\n".join(metadata_lines) + "\n" + full_line
+        return (formatted, avg_latency_ms)
 
     output_path_global = output_path
     
@@ -178,8 +200,13 @@ def main():
         _, ok0, metrics0 = check_key_e2e(link0, debug=True, cache=cache)
         all_metrics[link0] = metrics0
         if ok0:
-            available.append(format_key_with_metadata(link0, metrics0))
-            console.print(f"[green]✓[/green] [1/{total}] OK")
+            formatted, latency = format_key_with_metadata(link0, metrics0)
+            if latency <= MAX_LATENCY_MS:
+                available.append((formatted, latency))
+                available_keys.append(link0)
+                console.print(f"[green]✓[/green] [1/{total}] OK ({int(latency)}мс)")
+            else:
+                console.print(f"[yellow]✗[/yellow] [1/{total}] OK, но задержка {int(latency)}мс > {MAX_LATENCY_MS}мс (пропуск)")
         else:
             console.print(f"[red]✗[/red] [1/{total}] fail (см. логи выше)")
         links_only = links_only[1:]
@@ -218,7 +245,10 @@ def main():
                     link, ok, metrics = future.result()
                     all_metrics[link] = metrics
                     if ok:
-                        available.append(format_key_with_metadata(link, metrics))
+                        formatted, latency = format_key_with_metadata(link, metrics)
+                        if latency <= MAX_LATENCY_MS:
+                            available.append((formatted, latency))
+                            available_keys.append(link)
                     
                     # Обновляем прогресс-бар одной строкой
                     ok_count = len(available)
@@ -247,35 +277,81 @@ def main():
     save_results_and_exit(available, all_metrics, output_path, elapsed, total, cache)
 
 
-def save_results_and_exit(available: list, all_metrics: dict, output_path: str, elapsed: float, total: int, cache: Optional[dict] = None):
-    """Сохраняет результаты и выводит статистику."""
+def _create_top100_file(output_path: str, available_sorted: list[tuple[str, float]]) -> Optional[str]:
+    """
+    Создает файл с топ-100 конфигами (минимальная задержка).
+    Возвращает путь к созданному файлу или None если недостаточно ключей.
+    """
+    if len(available_sorted) == 0:
+        return None
+    
+    # Берем первые 100 элементов
+    top100 = available_sorted[:100]
+    
+    # Формируем имя файла: исходное_имя + (top100).txt
+    base_path = Path(output_path)
+    base_name = base_path.stem  # Имя без расширения
+    base_ext = base_path.suffix or ".txt"  # Расширение или .txt по умолчанию
+    top100_name = f"{base_name} (top100){base_ext}"
+    top100_path = base_path.parent / top100_name
+    
+    # Сохраняем top100 (с префиксом задержки для информации)
+    top100_lines = [item[0] for item in top100]
+    with open(top100_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(top100_lines))
+    
+    console.print(f"[cyan]Top100:[/cyan] {len(top100)} ключей с минимальной задержкой (от {top100[0][1]:.0f}мс до {top100[-1][1]:.0f}мс)")
+    return str(top100_path)
+
+
+def save_results_and_exit(available: list[tuple[str, float]], all_metrics: dict, output_path: str, elapsed: float, total: int, cache: Optional[dict] = None):
+    """
+    Сохраняет результаты и выводит статистику.
+    available: список кортежей (отформатированная_строка, задержка_в_мс)
+    """
     from logger_config import logger
     
     # Сохранение кэша
     if cache is not None and ENABLE_CACHE:
         save_cache(cache)
     
-    # Сохранение результатов в текстовый файл
-    if available:
+    # Сортировка по задержке (минимальная в начале)
+    available_sorted = sorted(available, key=lambda x: x[1])
+    
+    # Сохранение результатов в текстовый файл (отсортированные)
+    if available_sorted:
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        # Извлекаем только строки (без задержки) для сохранения
+        available_lines = [item[0] for item in available_sorted]
         with open(output_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(available))
-        console.print(f"\n[green]✓[/green] Результаты сохранены в: [bold]{output_path}[/bold]")
+            f.write("\n".join(available_lines))
+        console.print(f"\n[green]✓[/green] Результаты сохранены в: [bold]{output_path}[/bold] (отсортированы по задержке)")
+        
+        # Создание top100 файла
+        top100_path = _create_top100_file(output_path, available_sorted)
+        if top100_path:
+            console.print(f"[green]✓[/green] Top100 сохранен в: [bold]{top100_path}[/bold]")
     else:
         console.print("\n[yellow]Нет доступных ключей для сохранения.[/yellow]")
     
     # Расчет метрик производительности
     # Создаем множество доступных ссылок для быстрой проверки
     available_links = set()
-    for a in available:
-        # Если строка содержит метаданные (начинается с #), берем последнюю строку
-        lines = a.strip().split('\n')
+    for formatted_str, _ in available_sorted:
+        # Если строка содержит метаданные (начинается с # или [latency_ms]), берем последнюю строку
+        lines = formatted_str.strip().split('\n')
         if lines:
-            last_line = lines[-1].strip()
-            # Извлекаем чистую ссылку (до первого пробела или конца строки)
-            link = last_line.split()[0] if last_line.split() else last_line
-            if link.startswith(('vless://', 'vmess://', 'trojan://', 'ss://', 'hysteria://', 'hysteria2://', 'hy2://')):
-                available_links.add(link)
+            # Ищем строку с протоколом (последняя непустая строка, которая начинается с протокола)
+            for line in reversed(lines):
+                line = line.strip()
+                # Убираем префикс [latency_ms] если есть
+                if line.startswith('[') and 'ms]' in line:
+                    line = line.split(']', 1)[1].strip()
+                # Извлекаем чистую ссылку (до первого пробела или конца строки)
+                if line.startswith(('vless://', 'vmess://', 'trojan://', 'ss://', 'hysteria://', 'hysteria2://', 'hy2://')):
+                    link = line.split()[0] if line.split() else line
+                    available_links.add(link)
+                    break
     
     results_for_metrics = []
     for link, metrics in all_metrics.items():
