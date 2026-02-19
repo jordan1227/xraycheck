@@ -88,6 +88,7 @@ jobs:
           fi
           if [ -n "$CHANGED" ]; then
             git commit -m "chore: update white-list_available.txt and top100 [Docker, automated]"
+            git pull --rebase origin "${{ github.ref_name }}"
             git push
           else
             echo "white-list_available.txt and top100 unchanged, skip push"

@@ -68,6 +68,7 @@ jobs:
           fi
           if [ -n "$CHANGED" ]; then
             git commit -m "chore: update available.txt and top100 [automated]"
+            git pull --rebase origin "${{ github.ref_name }}"
             git push
           else
             echo "available.txt and top100 unchanged, skip push"
