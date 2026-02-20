@@ -16,6 +16,7 @@ jobs:
     permissions:
       contents: write
       repository-projects: read
+      actions: read
 
     steps:
       - name: Checkout repository
@@ -37,6 +38,7 @@ jobs:
           import os
           import json
           import urllib.request
+          import urllib.error
           
           token = os.environ['GITHUB_TOKEN']
           repo = os.environ['GITHUB_REPOSITORY']
@@ -46,31 +48,53 @@ jobs:
               'Accept': 'application/vnd.github.v3+json'
           }
           
-          # Получаем статистику просмотров
-          views_url = f'https://api.github.com/repos/{repo}/traffic/views'
-          req = urllib.request.Request(views_url, headers=headers)
-          with urllib.request.urlopen(req) as response:
-              views_data = json.loads(response.read())
-          
-          # Получаем статистику клонов
-          clones_url = f'https://api.github.com/repos/{repo}/traffic/clones'
-          req = urllib.request.Request(clones_url, headers=headers)
-          with urllib.request.urlopen(req) as response:
-              clones_data = json.loads(response.read())
-          
-          # Получаем основную информацию о репозитории
+          # Получаем основную информацию о репозитории (всегда доступна)
           repo_url = f'https://api.github.com/repos/{repo}'
-          req = urllib.request.Request(repo_url, headers=headers)
-          with urllib.request.urlopen(req) as response:
-              repo_data = json.loads(response.read())
+          try:
+              req = urllib.request.Request(repo_url, headers=headers)
+              with urllib.request.urlopen(req) as response:
+                  repo_data = json.loads(response.read())
+          except Exception as e:
+              print(f"⚠️ Ошибка при получении информации о репозитории: {e}")
+              repo_data = {}
           
-          # Извлекаем значения за 14 дней
-          views_14d = views_data.get('count', 0)
-          unique_visitors_14d = views_data.get('uniques', 0)
-          clones_14d = clones_data.get('count', 0)
-          unique_clones_14d = clones_data.get('uniques', 0)
+          # Получаем статистику просмотров (может быть недоступна)
+          views_14d = 0
+          unique_visitors_14d = 0
+          try:
+              views_url = f'https://api.github.com/repos/{repo}/traffic/views'
+              req = urllib.request.Request(views_url, headers=headers)
+              with urllib.request.urlopen(req) as response:
+                  views_data = json.loads(response.read())
+              views_14d = views_data.get('count', 0)
+              unique_visitors_14d = views_data.get('uniques', 0)
+          except urllib.error.HTTPError as e:
+              if e.code == 403:
+                  print("⚠️ Статистика просмотров недоступна (403 Forbidden). Возможно, требуется токен с правами администратора.")
+              else:
+                  print(f"⚠️ Ошибка при получении статистики просмотров: {e.code} {e.reason}")
+          except Exception as e:
+              print(f"⚠️ Ошибка при получении статистики просмотров: {e}")
           
-          # Извлекаем дополнительные метрики
+          # Получаем статистику клонов (может быть недоступна)
+          clones_14d = 0
+          unique_clones_14d = 0
+          try:
+              clones_url = f'https://api.github.com/repos/{repo}/traffic/clones'
+              req = urllib.request.Request(clones_url, headers=headers)
+              with urllib.request.urlopen(req) as response:
+                  clones_data = json.loads(response.read())
+              clones_14d = clones_data.get('count', 0)
+              unique_clones_14d = clones_data.get('uniques', 0)
+          except urllib.error.HTTPError as e:
+              if e.code == 403:
+                  print("⚠️ Статистика клонов недоступна (403 Forbidden). Возможно, требуется токен с правами администратора.")
+              else:
+                  print(f"⚠️ Ошибка при получении статистики клонов: {e.code} {e.reason}")
+          except Exception as e:
+              print(f"⚠️ Ошибка при получении статистики клонов: {e}")
+          
+          # Извлекаем дополнительные метрики (всегда доступны)
           stars = repo_data.get('stargazers_count', 0)
           forks = repo_data.get('forks_count', 0)
           
