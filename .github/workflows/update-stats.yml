@@ -150,18 +150,24 @@ jobs:
           # Паттерны для замены (ищем строки таблицы с любыми числами и пробелами)
           # Формат: | Показатель | Значение |
           # Порядок соответствует порядку в таблице README
+          # Используем функции замены вместо строк, чтобы избежать проблем с цифрами в значениях
+          def make_replacer(value):
+              def replacer(match):
+                  return match.group(1) + value + match.group(2)
+              return replacer
+          
           replacements = [
-              (r'(\| Просмотры \(14Д\) \| )[^\|]*(\|)', r'\1' + views + r'\2'),
-              (r'(\| Уникальные посетители \(14Д\) \| )[^\|]*(\|)', r'\1' + visitors + r'\2'),
-              (r'(\| Клоны \(14Д\) \| )[^\|]*(\|)', r'\1' + clones + r'\2'),
-              (r'(\| Уникальные клоны \(14Д\) \| )[^\|]*(\|)', r'\1' + unique_clones + r'\2'),
-              (r'(\| Звёзды \| )[^\|]*(\|)', r'\1' + stars + r'\2'),
-              (r'(\| Форки \| )[^\|]*(\|)', r'\1' + forks + r'\2'),
+              (r'(\| Просмотры \(14Д\) \| )[^\|]*(\|)', make_replacer(views)),
+              (r'(\| Уникальные посетители \(14Д\) \| )[^\|]*(\|)', make_replacer(visitors)),
+              (r'(\| Клоны \(14Д\) \| )[^\|]*(\|)', make_replacer(clones)),
+              (r'(\| Уникальные клоны \(14Д\) \| )[^\|]*(\|)', make_replacer(unique_clones)),
+              (r'(\| Звёзды \| )[^\|]*(\|)', make_replacer(stars)),
+              (r'(\| Форки \| )[^\|]*(\|)', make_replacer(forks)),
           ]
           
           # Заменяем значения
-          for pattern, replacement in replacements:
-              content = re.sub(pattern, replacement, content)
+          for pattern, replacer in replacements:
+              content = re.sub(pattern, replacer, content)
           
           # Записываем обратно
           with open('README.md', 'w', encoding='utf-8') as f:
