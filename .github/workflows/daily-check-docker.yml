@@ -129,16 +129,19 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Создаем директорию configs если её нет
           mkdir -p configs
-          # Добавляем файлы в git, если они существуют
           if [ -f "configs/white-list_available.txt" ]; then
             git add configs/white-list_available.txt
           fi
           if [ -f "configs/white-list_available(top100).txt" ]; then
             git add "configs/white-list_available(top100).txt"
           fi
-          # Проверяем, есть ли изменения в индексе
+          if ! git diff --cached --quiet; then
+            NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            OLD=$(cat configs/last-updated.json 2>/dev/null || echo '{}')
+            echo "$OLD" | jq -c --arg t "$NOW" '. + {"configs/white-list_available(top100).txt": $t, "configs/white-list_available.txt": $t}' > configs/last-updated.json
+            git add configs/last-updated.json
+          fi
           if ! git diff --cached --quiet; then
             git commit -m "chore: update configs/white-list_available.txt and top100 [Docker, automated]"
             git pull --rebase origin "${{ github.ref_name }}"

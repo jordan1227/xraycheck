@@ -384,19 +384,17 @@
             function setUpdated(el, text) {
                 if (el) el.textContent = 'Updated: ' + text;
             }
-            var repo = 'WhitePrime/xraycheck';
-            document.querySelectorAll('.updated[data-file]').forEach(function(el) {
-                var path = el.getAttribute('data-file');
-                if (!path) return;
-                fetch('https://api.github.com/repos/' + repo + '/commits?path=' + encodeURIComponent(path) + '&per_page=1')
-                    .then(function(r) { return r.json(); })
-                    .then(function(data) {
-                        if (Array.isArray(data) && data.length > 0 && data[0].commit && data[0].commit.committer) {
-                            setUpdated(el, formatMsk(data[0].commit.committer.date));
-                        }
-                    })
-                    .catch(function() {});
-            });
+            fetch('configs/last-updated.json')
+                .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+                .then(function(data) {
+                    if (!data || typeof data !== 'object') return;
+                    document.querySelectorAll('.updated[data-file]').forEach(function(el) {
+                        var path = el.getAttribute('data-file');
+                        var iso = path && data[path];
+                        if (iso) setUpdated(el, formatMsk(iso));
+                    });
+                })
+                .catch(function() {});
         })();
     </script>
 </body>

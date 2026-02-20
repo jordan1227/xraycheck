@@ -86,16 +86,19 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Создаем директорию configs если её нет
           mkdir -p configs
-          # Добавляем файлы в git, если они существуют
           if [ -f "configs/available.txt" ]; then
             git add configs/available.txt
           fi
           if [ -f "configs/available(top100).txt" ]; then
             git add "configs/available(top100).txt"
           fi
-          # Проверяем, есть ли изменения в индексе
+          if ! git diff --cached --quiet; then
+            NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            OLD=$(cat configs/last-updated.json 2>/dev/null || echo '{}')
+            echo "$OLD" | jq -c --arg t "$NOW" '. + {"configs/available(top100).txt": $t, "configs/available.txt": $t}' > configs/last-updated.json
+            git add configs/last-updated.json
+          fi
           if ! git diff --cached --quiet; then
             git commit -m "chore: update configs/available.txt and top100 [automated]"
             git pull --rebase origin "${{ github.ref_name }}"
