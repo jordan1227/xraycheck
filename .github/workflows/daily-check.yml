@@ -4,7 +4,9 @@ name: Daily VLESS check
 
 on:
   schedule:
-    - cron: '15 3 * * *'
+    - cron: '0 4 * * *'   # 7:00 MSK
+    - cron: '0 11 * * *'  # 14:00 MSK
+    - cron: '0 16 * * *'  # 19:00 MSK
   workflow_dispatch:
     # Ручной запуск из вкладки Actions
 
