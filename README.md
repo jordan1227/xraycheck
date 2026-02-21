@@ -5,7 +5,7 @@
 > Автоматически обновляемая коллекция публичных VPN-конфигов:
 > (**VLESS**, **VMess**, **Trojan**, **Shadowsocks**)
 
- | [**сайт**](https://whiteprime.github.io/xraycheck/) | [**конфиги**](https://github.com/WhitePrime/xraycheck/tree/main/configs) |
+ | [**Сайт**](https://whiteprime.github.io/xraycheck/) | [**Конфиги**](https://github.com/WhitePrime/xraycheck/tree/main/configs) |
 
  | [**Исходный код**](https://github.com/WhitePrime/xraycheck/tree/main) |
 
