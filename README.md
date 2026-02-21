@@ -26,6 +26,12 @@
 
 ## VPN-клиенты
 
+> Ссылки на подписки можно найти на [сайте](https://whiteprime.github.io/xraycheck/)
+> 
+> Добавление подписок в vpn-клиенты осуществляется через нажатие на + и выбор пункта "импорт из буфера обмена"
+
+
+
 | Android | Windows | Apple |
 |---------|---------|-------|
 | [Exclave](https://github.com/dyhkwong/Exclave/releases/) | [v2RayTun](https://storage.v2raytun.com/v2RayTun_Setup.exe) | [v2RayTun](https://apps.apple.com/en/app/v2raytun/id6476628951) |
