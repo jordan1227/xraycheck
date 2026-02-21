@@ -134,8 +134,10 @@ jobs:
           if [ -f "configs/white-list_available(top100)" ]; then git add "configs/white-list_available(top100)"; fi
           if ! git diff --cached --quiet; then
             NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            C=$(wc -l < "configs/white-list_available" 2>/dev/null || echo "0")
+            C100=$(wc -l < "configs/white-list_available(top100)" 2>/dev/null || echo "0")
             OLD=$(cat configs/last-updated.json 2>/dev/null || echo '{}')
-            echo "$OLD" | jq -c --arg t "$NOW" '. + {"configs/white-list_available(top100)": $t, "configs/white-list_available": $t}' > configs/last-updated.json
+            echo "$OLD" | jq -c --arg t "$NOW" --argjson c "$C" --argjson c100 "$C100" '.["configs/white-list_available"] = {updated: $t, count: $c} | .["configs/white-list_available(top100)"] = {updated: $t, count: $c100}' > configs/last-updated.json
             git add configs/last-updated.json
           fi
           if ! git diff --cached --quiet; then

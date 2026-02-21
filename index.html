@@ -499,8 +499,9 @@
                 var dateStr = d.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', year: 'numeric' });
                 return timeStr + ' ' + dateStr;
             }
-            function setUpdated(el, text) {
-                if (el) el.textContent = 'Updated: ' + text;
+            function setUpdated(el, text, count) {
+                if (!el) return;
+                el.textContent = 'Updated: ' + text + (count != null ? ' · ' + count.toLocaleString('ru-RU') + ' configs' : '');
             }
             fetch('configs/last-updated.json')
                 .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
@@ -508,8 +509,11 @@
                     if (!data || typeof data !== 'object') return;
                     document.querySelectorAll('.updated[data-file]').forEach(function(el) {
                         var path = el.getAttribute('data-file');
-                        var iso = path && data[path];
-                        if (iso) setUpdated(el, formatMsk(iso));
+                        var val = path && data[path];
+                        if (!val) return;
+                        var iso = typeof val === 'string' ? val : val.updated;
+                        var count = typeof val === 'object' && val.count != null ? val.count : null;
+                        if (iso) setUpdated(el, formatMsk(iso), count);
                     });
                 })
                 .catch(function() {});
