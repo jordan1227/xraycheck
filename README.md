@@ -1,6 +1,6 @@
 <div align="center">
 
-# XRaycheck - проверка VPN-ключей (end-to-end)
+# XRayCheck
 
 > Автоматически обновляемая коллекция публичных VPN-конфигов:
 > (**VLESS**, **VMess**, **Trojan**, **Shadowsocks**)
