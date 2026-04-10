@@ -1,14 +1,6 @@
-# Проверка конфигов в Docker (CIDR whitelist) и публикация white-list_available (без расширения)
-# Запускается сразу после успешного завершения workflow "Daily VLESS check".
-# Берёт список ключей из configs/available (не из links.txt).
-
 name: Daily VLESS check (Docker / whitelist)
 
 on:
-  workflow_run:
-    workflows: ["Daily VLESS check"]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
 
 env:
@@ -48,7 +40,6 @@ env:
 
 jobs:
   docker-check-and-publish:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:

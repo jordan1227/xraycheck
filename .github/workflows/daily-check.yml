@@ -104,3 +104,107 @@ jobs:
           else
             echo "configs/available and top100 unchanged, skip push"
           fi
+
+  docker-check-and-publish:
+    needs: check-and-publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      MODE: single
+      OUTPUT_FILE: white-list_available
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Ensure .env exists for docker compose
+        run: touch .env
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: docker compose build
+
+      - name: Run checker in Docker (input = configs/available from main)
+        env:
+          AVAILABLE_URL: https://raw.githubusercontent.com/${{ github.repository }}/main/configs/available
+        run: |
+          touch .before-docker-run
+          docker compose run --rm \
+            -e OUTPUT_FILE="$OUTPUT_FILE" \
+            -e OUTPUT_DIR="$OUTPUT_DIR" \
+            -e MODE="$MODE" \
+            -e OUTPUT_ADD_DATE="$OUTPUT_ADD_DATE" \
+            -e MAX_WORKERS="$MAX_WORKERS" \
+            -e EXPORT_FORMAT="$EXPORT_FORMAT" \
+            -e ENABLE_CACHE="$ENABLE_CACHE" \
+            -e TEST_URLS="$TEST_URLS" \
+            -e TEST_URLS_HTTPS="$TEST_URLS_HTTPS" \
+            -e REQUIRE_HTTPS="$REQUIRE_HTTPS" \
+            -e STRONG_STYLE_TEST="$STRONG_STYLE_TEST" \
+            -e STRONG_STYLE_TIMEOUT="$STRONG_STYLE_TIMEOUT" \
+            -e STRONG_MAX_RESPONSE_TIME="$STRONG_MAX_RESPONSE_TIME" \
+            -e STRONG_DOUBLE_CHECK="$STRONG_DOUBLE_CHECK" \
+            -e STRONG_ATTEMPTS="$STRONG_ATTEMPTS" \
+            -e REQUESTS_PER_URL="$REQUESTS_PER_URL" \
+            -e MIN_SUCCESSFUL_REQUESTS="$MIN_SUCCESSFUL_REQUESTS" \
+            -e MIN_SUCCESSFUL_URLS="$MIN_SUCCESSFUL_URLS" \
+            -e REQUEST_DELAY="$REQUEST_DELAY" \
+            -e CONNECT_TIMEOUT="$CONNECT_TIMEOUT" \
+            -e CONNECT_TIMEOUT_SLOW="$CONNECT_TIMEOUT_SLOW" \
+            -e USE_ADAPTIVE_TIMEOUT="$USE_ADAPTIVE_TIMEOUT" \
+            -e MAX_RETRIES="$MAX_RETRIES" \
+            -e MAX_RESPONSE_TIME="$MAX_RESPONSE_TIME" \
+            -e MIN_RESPONSE_SIZE="$MIN_RESPONSE_SIZE" \
+            -e MAX_LATENCY_MS="$MAX_LATENCY_MS" \
+            -e VERIFY_HTTPS_SSL="$VERIFY_HTTPS_SSL" \
+            -e STABILITY_CHECKS="$STABILITY_CHECKS" \
+            -e STABILITY_CHECK_DELAY="$STABILITY_CHECK_DELAY" \
+            -e STRICT_MODE="$STRICT_MODE" \
+            -e STRICT_MODE_REQUIRE_ALL="$STRICT_MODE_REQUIRE_ALL" \
+            -e TEST_POST_REQUESTS="$TEST_POST_REQUESTS" \
+            vless-checker "$AVAILABLE_URL"
+
+      - name: Verify configs/white-list_available and create top100 if missing
+        run: |
+          test -f "configs/white-list_available" || (echo "::error::configs/white-list_available not found" && exit 1)
+          if [ -f .before-docker-run ] && [ .before-docker-run -nt "configs/white-list_available" ]; then
+            echo "::warning::configs/white-list_available was not updated by Docker (0 results or checker wrote elsewhere), using existing file"
+          fi
+          if [ ! -f "configs/white-list_available(top100)" ]; then
+            echo "configs/white-list_available(top100) not created by checker, creating from first 100 lines of main file"
+            mkdir -p configs
+            head -n 100 "configs/white-list_available" > "configs/white-list_available(top100)"
+          fi
+          rm -f .before-docker-run
+          echo "Output files:"
+          ls -la configs/white-list_available "configs/white-list_available(top100)"
+
+      - name: Commit and push configs/white-list_available and configs/white-list_available(top100)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p configs
+          if [ -f "configs/white-list_available" ]; then git add configs/white-list_available; fi
+          if [ -f "configs/white-list_available(top100)" ]; then git add "configs/white-list_available(top100)"; fi
+          if ! git diff --cached --quiet; then
+            NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            C=$(wc -l < "configs/white-list_available" 2>/dev/null || echo "0")
+            C100=$(wc -l < "configs/white-list_available(top100)" 2>/dev/null || echo "0")
+            OLD=$(cat configs/last-updated.json 2>/dev/null || echo '{}')
+            echo "$OLD" | jq -c --arg t "$NOW" --argjson c "$C" --argjson c100 "$C100" '.["configs/white-list_available"] = {updated: $t, count: $c} | .["configs/white-list_available(top100)"] = {updated: $t, count: $c100}' > configs/last-updated.json
+            git add configs/last-updated.json
+          fi
+          if ! git diff --cached --quiet; then
+            git commit -m "update configs/white-list_available and top100 [Docker, automated]"
+            git pull --rebase origin "${{ github.ref_name }}"
+            git push
+          else
+            echo "configs/white-list_available and top100 unchanged, skip push"
+          fi
