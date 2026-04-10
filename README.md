@@ -18,13 +18,11 @@
 >
 
 
-[**Пример использования**](https://github.com/WhitePrime/xraycheck/wiki/%D0%98%D1%81%D0%BF%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5-%D0%BF%D0%BE%D0%B4%D0%BF%D0%B8%D1%81%D0%BA%D0%B8-%D0%BD%D0%B0-%D0%BF%D1%80%D0%B8%D0%BC%D0%B5%D1%80%D0%B5-v2RayTun)
-
  ****
 
- | [**Сайт**](https://whiteprime.github.io/xraycheck/) | [**Конфиги**](https://github.com/WhitePrime/xraycheck/tree/main/configs) |
+ | [**Сайт**](https://jordan1227.github.io/xraycheck/) | [**Конфиги**](https://github.com/jordan1227/xraycheck/tree/main/configs) |
 
- | [**Исходный код**](https://github.com/WhitePrime/xraycheck/tree/main) |
+ | [**Исходный код**](https://github.com/jordan1227/xraycheck/tree/main) |
 
 ****
 
@@ -43,7 +41,7 @@
 
 ## VPN-клиенты
 
-> Ссылки на подписки можно найти на [сайте](https://whiteprime.github.io/xraycheck/)
+> Ссылки на подписки можно найти на [сайте](https://jordan1227.github.io/xraycheck/)
 > 
 > Добавление подписок в vpn-клиенты осуществляется через нажатие на + и выбор пункта "импорт из буфера обмена"
 
@@ -96,7 +94,7 @@
 2. Делает HTTP(S)-запрос к тестовому URL **через прокси**.
 3. По ответу (статус, время, при необходимости несколько URL и повторные запросы) ключ считается рабочим или мёртвым.
 
-Рабочие ключи сохраняются в директории `configs/` без расширения: `available`, `available(top100)`. При запуске через Docker — `configs/white-list_available`, `configs/white-list_available(top100)`. Ссылки на скачивание с GitHub Pages: `https://whiteprime.github.io/xraycheck/configs/...` (то же имя файла без расширения).
+Рабочие ключи сохраняются в директории `configs/` без расширения: `available`, `available(top100)`. При запуске через Docker — `configs/white-list_available`, `configs/white-list_available(top100)`. Ссылки на скачивание с GitHub Pages: `https://jordan1227.github.io/xraycheck/configs/...` (то же имя файла без расширения).
 
 ## Требования
 
