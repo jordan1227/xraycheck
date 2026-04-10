@@ -53,8 +53,6 @@
 |---------|---------|-------|
 | [Exclave](https://github.com/dyhkwong/Exclave/releases/) | [v2RayTun](https://storage.v2raytun.com/v2RayTun_Setup.exe) | [v2RayTun](https://apps.apple.com/en/app/v2raytun/id6476628951) |
 | [v2rayTun](https://play.google.com/store/apps/details?id=com.v2raytun.android) | [Throne](https://github.com/throneproj/Throne/releases) | [V2Box](https://apps.apple.com/ru/app/v2box-v2ray-client/id6446814690) |
-| [Happ](https://play.google.com/store/apps/details?id=com.happproxy) | [Happ](https://github.com/Happ-proxy/happ-desktop/releases/latest/download/setup-Happ.x64.exe) | [Happ](https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973) |
-
 </div>
 
 ****
