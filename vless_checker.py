@@ -280,11 +280,40 @@ def main():
 
 # Регулярка для удаления префикса задержки "[123ms] " перед публикацией
 _LATENCY_PREFIX_RE = re.compile(r"^\[\d+ms\]\s*", re.MULTILINE)
+_PROXY_SCHEMES = ("vless://", "vmess://", "trojan://", "ss://", "hysteria://", "hysteria2://", "hy2://")
 
 
 def _strip_latency_prefix(text: str) -> str:
     """Убирает префикс задержки [Nms] из начала строк перед записью в файл для публикации."""
     return _LATENCY_PREFIX_RE.sub("", text)
+
+
+def _strip_proxy_fragment(link: str) -> str:
+    return link.split("#", 1)[0]
+
+
+def _find_proxy_link(text: str) -> Optional[str]:
+    for line in reversed(text.strip().split("\n")):
+        line = line.strip()
+        if line.startswith("[") and "ms]" in line:
+            line = line.split("]", 1)[1].strip()
+        if line.startswith(_PROXY_SCHEMES):
+            parts = line.split()
+            return parts[0] if parts else line
+    return None
+
+
+def _apply_numeric_names(entries: list[str]) -> list[str]:
+    result = []
+    for index, entry in enumerate(entries, 1):
+        lines = entry.strip().split("\n")
+        for line_index in range(len(lines) - 1, -1, -1):
+            line = lines[line_index].strip()
+            if line.startswith(_PROXY_SCHEMES):
+                lines[line_index] = f"{_strip_proxy_fragment(line)}#{index}"
+                break
+        result.append("\n".join(lines))
+    return result
 
 
 def _create_top100_file(output_path: str, available_sorted: list[tuple[str, float]]) -> Optional[str]:
@@ -307,7 +336,7 @@ def _create_top100_file(output_path: str, available_sorted: list[tuple[str, floa
     top100_path = base_path.parent / top100_name
     
     # Сохраняем top100 без префикса задержки (для публикации)
-    top100_lines = [_strip_latency_prefix(item[0]) for item in top100]
+    top100_lines = _apply_numeric_names([_strip_latency_prefix(item[0]) for item in top100])
     top100_path.parent.mkdir(parents=True, exist_ok=True)
     with open(top100_path, "w", encoding="utf-8") as f:
         f.write("\n".join(top100_lines))
@@ -333,7 +362,7 @@ def save_results_and_exit(available: list[tuple[str, float]], all_metrics: dict,
     # Сохранение результатов в текстовый файл (отсортированные, без префикса задержки для публикации)
     if available_sorted:
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        available_lines = [_strip_latency_prefix(item[0]) for item in available_sorted]
+        available_lines = _apply_numeric_names([_strip_latency_prefix(item[0]) for item in available_sorted])
         with open(output_path, "w", encoding="utf-8") as f:
             f.write("\n".join(available_lines))
         console.print(f"\n[green]✓[/green] Результаты сохранены в: [bold]{output_path}[/bold] (отсортированы по задержке)")
@@ -349,20 +378,9 @@ def save_results_and_exit(available: list[tuple[str, float]], all_metrics: dict,
     # Создаем множество доступных ссылок для быстрой проверки
     available_links = set()
     for formatted_str, _ in available_sorted:
-        # Если строка содержит метаданные (начинается с # или [latency_ms]), берем последнюю строку
-        lines = formatted_str.strip().split('\n')
-        if lines:
-            # Ищем строку с протоколом (последняя непустая строка, которая начинается с протокола)
-            for line in reversed(lines):
-                line = line.strip()
-                # Убираем префикс [latency_ms] если есть
-                if line.startswith('[') and 'ms]' in line:
-                    line = line.split(']', 1)[1].strip()
-                # Извлекаем чистую ссылку (до первого пробела или конца строки)
-                if line.startswith(('vless://', 'vmess://', 'trojan://', 'ss://', 'hysteria://', 'hysteria2://', 'hy2://')):
-                    link = line.split()[0] if line.split() else line
-                    available_links.add(link)
-                    break
+        link = _find_proxy_link(_strip_latency_prefix(formatted_str))
+        if link:
+            available_links.add(_strip_proxy_fragment(link))
     
     results_for_metrics = []
     for link, metrics in all_metrics.items():

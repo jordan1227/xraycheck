@@ -98,7 +98,7 @@ jobs:
             git add configs/last-updated.json
           fi
           if ! git diff --cached --quiet; then
-            git commit -m "chore: update configs/available and top100 [automated]"
+            git commit -m "update configs/available and top100 [automated]"
             git pull --rebase origin "${{ github.ref_name }}"
             git push
           else

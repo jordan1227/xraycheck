@@ -141,7 +141,7 @@ jobs:
             git add configs/last-updated.json
           fi
           if ! git diff --cached --quiet; then
-            git commit -m "chore: update configs/white-list_available and top100 [Docker, automated]"
+            git commit -m "update configs/white-list_available and top100 [Docker, automated]"
             git pull --rebase origin "${{ github.ref_name }}"
             git push
           else

@@ -9,7 +9,7 @@ import json
 import os
 import requests
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs, unquote
+from urllib.parse import parse_qs, parse_qsl, unquote, urlencode, urlparse, urlsplit, urlunsplit
 
 from .config import OUTPUT_ADD_DATE, OUTPUT_DIR, OUTPUT_FILE
 from rich.console import Console
@@ -21,6 +21,148 @@ from rich.progress import (
 )
 
 console = Console()
+
+_PROMO_MARKERS = ("t.me", "telegram", "joinchat", "tg://", "tg:", "join-tg")
+_DISPLAY_QUERY_KEYS = {"description", "label", "name", "note", "ps", "remark", "remarks", "title"}
+_CRITICAL_PROMO_KEYS = {"add", "address", "host", "peer", "servername", "sni"}
+_PATH_KEYS = {"path", "wspath"}
+
+
+def _decode_repeated(value: str, rounds: int = 2) -> str:
+    decoded = value
+    for _ in range(rounds):
+        next_value = unquote(decoded)
+        if next_value == decoded:
+            break
+        decoded = next_value
+    return decoded
+
+
+def _contains_promo(value: str) -> bool:
+    decoded = _decode_repeated(value).lower()
+    return any(marker in decoded for marker in _PROMO_MARKERS)
+
+
+def _sanitize_embedded_path(value: str) -> str | None:
+    decoded = _decode_repeated(value).strip()
+    if not decoded:
+        return "/"
+
+    path_part, separator, query_part = decoded.partition("?")
+    path_part = path_part or "/"
+
+    if _contains_promo(path_part):
+        return None
+
+    if not separator:
+        return path_part
+
+    kept_parts = []
+    for part in query_part.split("&"):
+        part = part.strip()
+        if not part or _contains_promo(part):
+            continue
+        kept_parts.append(part)
+
+    sanitized = path_part
+    if kept_parts:
+        sanitized += "?" + "&".join(kept_parts)
+
+    return None if _contains_promo(sanitized) else sanitized
+
+
+def _sanitize_query_pairs(pairs: list[tuple[str, str]]) -> list[tuple[str, str]] | None:
+    sanitized = []
+    for key, value in pairs:
+        key = key.strip()
+        value = value.strip()
+        key_lower = key.lower()
+
+        if key_lower in _DISPLAY_QUERY_KEYS:
+            continue
+
+        if key_lower in _PATH_KEYS:
+            path_value = _sanitize_embedded_path(value)
+            if path_value is None:
+                return None
+            sanitized.append((key, path_value))
+            continue
+
+        if _contains_promo(key):
+            continue
+
+        if _contains_promo(value):
+            if key_lower in _CRITICAL_PROMO_KEYS:
+                return None
+            continue
+
+        sanitized.append((key, value))
+
+    return sanitized
+
+
+def _sanitize_standard_proxy_url(proxy_url: str) -> str | None:
+    parts = urlsplit(proxy_url)
+    if not parts.scheme or not (parts.netloc or parts.path):
+        return None
+
+    if _contains_promo(parts.netloc) or _contains_promo(parts.path):
+        return None
+
+    query_pairs = parse_qsl(parts.query, keep_blank_values=True)
+    sanitized_pairs = _sanitize_query_pairs(query_pairs)
+    if sanitized_pairs is None:
+        return None
+
+    query = urlencode(sanitized_pairs, doseq=True)
+    sanitized = urlunsplit((parts.scheme, parts.netloc, parts.path, query, ""))
+    return None if _contains_promo(sanitized) else sanitized
+
+
+def _sanitize_vmess_base64_url(proxy_url: str) -> str | None:
+    payload = proxy_url[len("vmess://"):].split("#", 1)[0].strip()
+    if not payload:
+        return None
+
+    padded = payload + "=" * ((4 - len(payload) % 4) % 4)
+    try:
+        decoded = base64.urlsafe_b64decode(padded).decode("utf-8")
+        data = json.loads(decoded)
+    except Exception:
+        return _sanitize_standard_proxy_url(proxy_url)
+
+    for key in list(data.keys()):
+        if key.lower() in _DISPLAY_QUERY_KEYS:
+            data.pop(key, None)
+
+    for key in ("add", "host", "sni"):
+        value = str(data.get(key, "") or "")
+        if value and _contains_promo(value):
+            return None
+
+    if "path" in data:
+        path_value = _sanitize_embedded_path(str(data.get("path", "")))
+        if path_value is None:
+            return None
+        data["path"] = path_value
+
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii")
+    sanitized = f"vmess://{encoded}"
+    return None if _contains_promo(sanitized) else sanitized
+
+
+def sanitize_proxy_url(proxy_url: str) -> str | None:
+    proxy_url = proxy_url.strip()
+    if not proxy_url:
+        return None
+
+    raw_vmess = proxy_url[len("vmess://"):].split("#", 1)[0] if proxy_url.startswith("vmess://") else ""
+    if raw_vmess and "@" not in raw_vmess:
+        return _sanitize_vmess_base64_url(proxy_url)
+
+    return _sanitize_standard_proxy_url(proxy_url)
 
 
 def get_source_name(url_or_path: str) -> str:
@@ -129,16 +271,17 @@ def parse_proxy_lines(text: str) -> list[tuple[str, str]]:
     """Возвращает список (прокси_ссылка, полная_строка) для строк с поддерживаемыми протоколами."""
     supported_protocols = ("vless://", "vmess://", "trojan://", "ss://", "hysteria://", "hysteria2://", "hy2://")
     result = []
+    seen_links = set()
     for line in text.splitlines():
         line = line.strip()
         if not line:
             continue
-        # Проверяем, начинается ли строка с одного из поддерживаемых протоколов
         for protocol in supported_protocols:
             if line.startswith(protocol):
-                link = line.split(maxsplit=1)[0].strip()
-                if link:
-                    result.append((link, line))
+                link = sanitize_proxy_url(line.split(maxsplit=1)[0].strip())
+                if link and link not in seen_links:
+                    seen_links.add(link)
+                    result.append((link, link))
                 break
     return result
 

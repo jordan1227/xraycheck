@@ -26,8 +26,6 @@
 
  | [**Исходный код**](https://github.com/WhitePrime/xraycheck/tree/main) |
 
-> [**Telegram-бот для обратной связи**](https://t.me/XRayCheckSupportBot)
-
 ****
 
 
