@@ -4,10 +4,13 @@ name: Daily VLESS check
 
 on:
   schedule:
-    # MSK (UTC+3). Сдвиг на 10 мин от начала часа уменьшает задержки GitHub
-    - cron: '10 2 * * *'   # 7:10 MSK
-    - cron: '10 9 * * *'  # 14:10 MSK
-    - cron: '10 14 * * *'  # 19:10 MSK
+    # MSK. Non-zero minute avoids GitHub's top-of-hour schedule queue.
+    - cron: '17 7 * * *'
+      timezone: Europe/Moscow
+    - cron: '17 14 * * *'
+      timezone: Europe/Moscow
+    - cron: '17 19 * * *'
+      timezone: Europe/Moscow
   workflow_dispatch:
     # Ручной запуск из вкладки Actions
 
@@ -89,14 +92,12 @@ jobs:
           mkdir -p configs
           if [ -f "configs/available" ]; then git add configs/available; fi
           if [ -f "configs/available(top100)" ]; then git add "configs/available(top100)"; fi
-          if ! git diff --cached --quiet; then
-            NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            C=$(wc -l < "configs/available" 2>/dev/null || echo "0")
-            C100=$(wc -l < "configs/available(top100)" 2>/dev/null || echo "0")
-            OLD=$(cat configs/last-updated.json 2>/dev/null || echo '{}')
-            echo "$OLD" | jq -c --arg t "$NOW" --argjson c "$C" --argjson c100 "$C100" '.["configs/available"] = {updated: $t, count: $c} | .["configs/available(top100)"] = {updated: $t, count: $c100}' > configs/last-updated.json
-            git add configs/last-updated.json
-          fi
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          C=$(wc -l < "configs/available" 2>/dev/null || echo "0")
+          C100=$(wc -l < "configs/available(top100)" 2>/dev/null || echo "0")
+          OLD=$(cat configs/last-updated.json 2>/dev/null || echo '{}')
+          echo "$OLD" | jq -c --arg t "$NOW" --argjson c "$C" --argjson c100 "$C100" '.["configs/available"] = {updated: $t, count: $c} | .["configs/available(top100)"] = {updated: $t, count: $c100}' > configs/last-updated.json
+          git add configs/last-updated.json
           if ! git diff --cached --quiet; then
             git commit -m "update configs/available and top100 [automated]"
             git pull --rebase origin "${{ github.ref_name }}"
@@ -193,14 +194,12 @@ jobs:
           mkdir -p configs
           if [ -f "configs/white-list_available" ]; then git add configs/white-list_available; fi
           if [ -f "configs/white-list_available(top100)" ]; then git add "configs/white-list_available(top100)"; fi
-          if ! git diff --cached --quiet; then
-            NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            C=$(wc -l < "configs/white-list_available" 2>/dev/null || echo "0")
-            C100=$(wc -l < "configs/white-list_available(top100)" 2>/dev/null || echo "0")
-            OLD=$(cat configs/last-updated.json 2>/dev/null || echo '{}')
-            echo "$OLD" | jq -c --arg t "$NOW" --argjson c "$C" --argjson c100 "$C100" '.["configs/white-list_available"] = {updated: $t, count: $c} | .["configs/white-list_available(top100)"] = {updated: $t, count: $c100}' > configs/last-updated.json
-            git add configs/last-updated.json
-          fi
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          C=$(wc -l < "configs/white-list_available" 2>/dev/null || echo "0")
+          C100=$(wc -l < "configs/white-list_available(top100)" 2>/dev/null || echo "0")
+          OLD=$(cat configs/last-updated.json 2>/dev/null || echo '{}')
+          echo "$OLD" | jq -c --arg t "$NOW" --argjson c "$C" --argjson c100 "$C100" '.["configs/white-list_available"] = {updated: $t, count: $c} | .["configs/white-list_available(top100)"] = {updated: $t, count: $c100}' > configs/last-updated.json
+          git add configs/last-updated.json
           if ! git diff --cached --quiet; then
             git commit -m "update configs/white-list_available and top100 [Docker, automated]"
             git pull --rebase origin "${{ github.ref_name }}"

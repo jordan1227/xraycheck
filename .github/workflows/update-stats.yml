@@ -4,8 +4,9 @@ name: Update Repository Stats
 
 on:
   schedule:
-    # Обновление статистики раз в день в 00:00 UTC (03:00 MSK)
-    - cron: '0 0 * * *'
+    # MSK. Non-zero minute avoids GitHub's top-of-hour schedule queue.
+    - cron: '17 3 * * *'
+      timezone: Europe/Moscow
   workflow_dispatch:
     # Ручной запуск из вкладки Actions
 
