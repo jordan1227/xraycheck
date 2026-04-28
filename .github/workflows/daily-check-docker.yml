@@ -37,6 +37,7 @@ env:
   STRICT_MODE: 'true'
   STRICT_MODE_REQUIRE_ALL: 'true'
   TEST_POST_REQUESTS: 'false'
+  MIN_PUBLISHED_CONFIGS: '10'
 
 jobs:
   docker-check-and-publish:
@@ -105,15 +106,25 @@ jobs:
         run: |
           test -f "configs/white-list_available" || (echo "::error::configs/white-list_available not found" && exit 1)
           if [ -f .before-docker-run ] && [ .before-docker-run -nt "configs/white-list_available" ]; then
-            echo "::warning::configs/white-list_available was not updated by Docker (0 results or checker wrote elsewhere), using existing file"
+            echo "::error::configs/white-list_available was not updated by Docker; keeping previous published files"
+            git restore --source=HEAD -- "configs/white-list_available" "configs/white-list_available(top100)" 2>/dev/null || true
+            exit 1
           fi
-          if [ ! -f "configs/white-list_available(top100)" ]; then
+          MIN_COUNT="${MIN_PUBLISHED_CONFIGS:-10}"
+          COUNT=$(awk 'NF { count++ } END { print count + 0 }' "configs/white-list_available")
+          if [ "$COUNT" -lt "$MIN_COUNT" ]; then
+            echo "::error::configs/white-list_available has only $COUNT configs; minimum is $MIN_COUNT. Keeping previous published files."
+            git restore --source=HEAD -- "configs/white-list_available" "configs/white-list_available(top100)" 2>/dev/null || true
+            exit 1
+          fi
+          if [ ! -s "configs/white-list_available(top100)" ] || [ "configs/white-list_available" -nt "configs/white-list_available(top100)" ]; then
             echo "configs/white-list_available(top100) not created by checker, creating from first 100 lines of main file"
             mkdir -p configs
             head -n 100 "configs/white-list_available" > "configs/white-list_available(top100)"
           fi
           rm -f .before-docker-run
           echo "Output files:"
+          echo "configs/white-list_available passed validation with $COUNT configs"
           ls -la configs/white-list_available "configs/white-list_available(top100)"
 
       - name: Commit and push configs/white-list_available and configs/white-list_available(top100)
@@ -124,8 +135,8 @@ jobs:
           if [ -f "configs/white-list_available" ]; then git add configs/white-list_available; fi
           if [ -f "configs/white-list_available(top100)" ]; then git add "configs/white-list_available(top100)"; fi
           NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          C=$(wc -l < "configs/white-list_available" 2>/dev/null || echo "0")
-          C100=$(wc -l < "configs/white-list_available(top100)" 2>/dev/null || echo "0")
+          C=$(awk 'NF { count++ } END { print count + 0 }' "configs/white-list_available" 2>/dev/null || echo "0")
+          C100=$(awk 'NF { count++ } END { print count + 0 }' "configs/white-list_available(top100)" 2>/dev/null || echo "0")
           OLD=$(cat configs/last-updated.json 2>/dev/null || echo '{}')
           echo "$OLD" | jq -c --arg t "$NOW" --argjson c "$C" --argjson c100 "$C100" '.["configs/white-list_available"] = {updated: $t, count: $c} | .["configs/white-list_available(top100)"] = {updated: $t, count: $c100}' > configs/last-updated.json
           git add configs/last-updated.json
