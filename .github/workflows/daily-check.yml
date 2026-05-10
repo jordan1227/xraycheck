@@ -4,13 +4,10 @@ name: Daily VLESS check
 
 on:
   schedule:
-    # MSK. Non-zero minute avoids GitHub's top-of-hour schedule queue.
-    - cron: '17 7 * * *'
-      timezone: Europe/Moscow
-    - cron: '17 14 * * *'
-      timezone: Europe/Moscow
-    - cron: '17 19 * * *'
-      timezone: Europe/Moscow
+    # I run this in UTC for 07:23, 14:23, and 19:23 MSK.
+    - cron: '23 4 * * *'
+    - cron: '23 11 * * *'
+    - cron: '23 16 * * *'
   workflow_dispatch:
     # Ручной запуск из вкладки Actions
 

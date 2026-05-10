@@ -266,7 +266,7 @@ chmod +x run_check.sh
 
 В репозитории настроен workflow **Daily VLESS check** (`.github/workflows/daily-check.yml`):
 
-- **Расписание:** три раза в день в 7:10 | 14:10 | 19:10 MSK (cron).
+- **Расписание:** три раза в день в 7:23 | 14:23 | 19:23 MSK (cron).
 - **Действия:** запуск `vless_checker.py` в режиме `merge` (списки из `links.txt`), результат пишется в `configs/available` и `configs/available(top100)`; копии в корень для GitHub Pages; при изменении — коммит и push.
 - **Ручной запуск:** вкладка Actions → «Daily VLESS check» → Run workflow.
 
